@@ -15,7 +15,7 @@ const PATCH_CONTEXT_LINES = 3;
 const SELF_TEST_OPEN_DIFF_TIMEOUT_MS = 20_000;
 const NATIVE_DIFF_HISTORY_KEY = "remoteGitDiff.nativeDiffHistory";
 const MAX_PATCH_ROWS_FOR_WEBVIEW = 20_000;
-const MAX_PATCH_BYTES_FOR_WEBVIEW = 2_500_000;
+const MAX_PATCH_BYTES_FOR_WEBVIEW = 12_000_000;
 
 type ConnectionState = "disconnected" | "connecting" | "connected" | "reconnecting" | "error";
 
@@ -172,6 +172,13 @@ function getPatchViewStyles(): string {
       overflow: hidden;
       text-overflow: clip;
       white-space: pre;
+    }
+    .inline-delete {
+      background: var(--vscode-diffEditor-removedTextBackground, rgba(255, 0, 0, 0.28));
+      text-decoration: line-through;
+    }
+    .inline-insert {
+      background: var(--vscode-diffEditor-insertedTextBackground, rgba(155, 185, 85, 0.32));
     }
     .row-delete .left-code,
     .row-pair .left-code {
@@ -851,13 +858,11 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         logger.info("改用补丁差异视图", { requestId: token.requestId, path: change.path });
         const patchLength = Buffer.byteLength(patch, "utf8");
-        const rows = buildPatchRows(patch);
-        if (patchLength > MAX_PATCH_BYTES_FOR_WEBVIEW || rows.length > MAX_PATCH_ROWS_FOR_WEBVIEW) {
+        if (patchLength > MAX_PATCH_BYTES_FOR_WEBVIEW) {
           logger.warn("补丁内容过大，改为摘要视图", {
             requestId: token.requestId,
             path: change.path,
-            patchLength,
-            rowCount: rows.length
+            patchLength
           });
           await rememberNativeDiffOutcome(change, {
             fallbackCountDelta: 1,
@@ -867,10 +872,11 @@ export function activate(context: vscode.ExtensionContext): void {
             leftLength,
             rightLength,
             patchLength,
-            reason: `补丁过大（>${formatBytes(MAX_PATCH_BYTES_FOR_WEBVIEW)} 或超过 ${MAX_PATCH_ROWS_FOR_WEBVIEW} 行渲染上限）。`
+            reason: `补丁过大（>${formatBytes(MAX_PATCH_BYTES_FOR_WEBVIEW)}），继续加载会明显增加 VS Code 卡顿风险。`
           });
           return;
         }
+        const rows = buildPatchRows(patch, MAX_PATCH_ROWS_FOR_WEBVIEW);
         logger.info("patch view timing", {
           requestId: token.requestId,
           path: change.path,

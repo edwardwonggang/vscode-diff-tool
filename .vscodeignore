@@ -1,0 +1,14 @@
+.git/**
+.specstory/**
+.vscode/**
+.vscode-test/**
+docs/**
+src/**
+scripts/**
+test-results/**
+out/test/**
+out/vscodeTest/**
+out/webview/**
+**/*.map
+tsconfig.json
+remote-git-diff-tool-*.vsix
