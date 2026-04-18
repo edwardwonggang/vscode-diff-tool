@@ -75,6 +75,16 @@
         "command": "remoteGitDiff.openLogFile",
         "title": "打开远程 Git Diff 日志",
         "icon": "$(output)"
+      },
+      {
+        "command": "remoteGitDiff.hideCurrentTrackedChanges",
+        "title": "隐藏当前变更",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "remoteGitDiff.restoreHiddenTrackedChanges",
+        "title": "恢复隐藏变更",
+        "icon": "$(eye)"
       }
     ],
     "menus": {
@@ -102,6 +112,16 @@
         {
           "command": "remoteGitDiff.openLogFile",
           "when": "view == remoteGitDiff.changes",
+          "group": "navigation"
+        },
+        {
+          "command": "remoteGitDiff.hideCurrentTrackedChanges",
+          "when": "view == remoteGitDiff.changes && remoteGitDiff.connectionState == connected && remoteGitDiff.hasChanges",
+          "group": "navigation"
+        },
+        {
+          "command": "remoteGitDiff.restoreHiddenTrackedChanges",
+          "when": "view == remoteGitDiff.changes && remoteGitDiff.connectionState == connected && remoteGitDiff.hasHiddenTrackedFiles",
           "group": "navigation"
         }
       ],

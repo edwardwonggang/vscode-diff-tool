@@ -512,6 +512,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const interactionController = new InteractionController();
   let patchDiffPanel: vscode.WebviewPanel | undefined;
   let activeDiffAbortController: AbortController | undefined;
+  let visibleChanges: RemoteGitChange[] = [];
+  let hiddenTrackedFilePaths: string[] = [];
   const nativeDiffHistory = new Map<string, NativeDiffHistoryEntry>(
     Object.entries(context.workspaceState.get<Record<string, NativeDiffHistoryEntry>>(NATIVE_DIFF_HISTORY_KEY, {}))
   );
@@ -707,6 +709,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
         const config = await service.getConfig();
         const changes = await service.listChanges();
+        const hiddenTrackedFiles = await service.readHiddenTrackedFiles();
+        hiddenTrackedFilePaths = hiddenTrackedFiles.paths;
+        const hiddenPathSet = new Set(hiddenTrackedFilePaths);
+        const filteredChanges = changes.filter((change) => !hiddenPathSet.has(change.path));
         const branch = await service.getCurrentBranch(config);
         const target = config.host ? `${config.username}@${config.host}` : "工作区";
 
@@ -715,8 +721,10 @@ export function activate(context: vscode.ExtensionContext): void {
           return;
         }
 
-        treeProvider.setChanges(changes);
-        await vscode.commands.executeCommand("setContext", "remoteGitDiff.hasChanges", changes.length > 0);
+        visibleChanges = filteredChanges;
+        treeProvider.setChanges(filteredChanges);
+        await vscode.commands.executeCommand("setContext", "remoteGitDiff.hasChanges", filteredChanges.length > 0);
+        await vscode.commands.executeCommand("setContext", "remoteGitDiff.hasHiddenTrackedFiles", hiddenTrackedFilePaths.length > 0);
         updateStatusBar("connected", {
           branch,
           target,
@@ -724,7 +732,11 @@ export function activate(context: vscode.ExtensionContext): void {
         });
         logger.info("刷新远程变更完成", { reason, count: changes.length, branch, target });
       } catch (error) {
+        visibleChanges = [];
+        hiddenTrackedFilePaths = [];
         treeProvider.clear();
+        await vscode.commands.executeCommand("setContext", "remoteGitDiff.hasChanges", false);
+        await vscode.commands.executeCommand("setContext", "remoteGitDiff.hasHiddenTrackedFiles", false);
         const message = error instanceof Error ? error.message : String(error);
         logger.error("刷新远程变更失败", error);
         updateStatusBar("error", { tooltip: message });
@@ -746,6 +758,62 @@ export function activate(context: vscode.ExtensionContext): void {
     if (!isConnectedState(connectionState)) {
       throw new Error("当前远程连接不可用，请稍后重试。");
     }
+  };
+
+  const hideCurrentTrackedChanges = async (): Promise<void> => {
+    await ensureConnectedForOpenDiff();
+    if (visibleChanges.length === 0) {
+      void vscode.window.showInformationMessage("当前没有可隐藏的 tracked 变更。");
+      return;
+    }
+
+    const choice = await vscode.window.showWarningMessage(
+      `将当前 ${visibleChanges.length} 个 tracked 变更写入项目级隐藏清单，后续插件不再显示，是否继续？`,
+      { modal: true },
+      "继续",
+      "取消"
+    );
+    if (choice !== "继续") {
+      return;
+    }
+
+    const result = await service.addHiddenTrackedFiles(visibleChanges.map((change) => change.path));
+    hiddenTrackedFilePaths = result.paths;
+    logger.info("已更新 tracked 隐藏清单", {
+      addedCount: visibleChanges.length,
+      totalHiddenCount: result.paths.length,
+      filePath: result.filePath
+    });
+    void vscode.window.showInformationMessage(`已隐藏当前变更。清单文件：${result.filePath}`);
+    await refresh("hide-tracked");
+  };
+
+  const restoreHiddenTrackedChanges = async (): Promise<void> => {
+    await ensureConnectedForOpenDiff();
+    if (hiddenTrackedFilePaths.length === 0) {
+      void vscode.window.showInformationMessage("当前没有已隐藏的 tracked 文件。");
+      return;
+    }
+
+    const restoredCount = hiddenTrackedFilePaths.length;
+    const choice = await vscode.window.showWarningMessage(
+      `将清空当前项目的隐藏清单，并恢复 ${restoredCount} 个 tracked 文件显示，是否继续？`,
+      { modal: true },
+      "恢复",
+      "取消"
+    );
+    if (choice !== "恢复") {
+      return;
+    }
+
+    const result = await service.clearHiddenTrackedFiles();
+    hiddenTrackedFilePaths = result.paths;
+    logger.info("已清空 tracked 隐藏清单", {
+      restoredCount,
+      filePath: result.filePath
+    });
+    void vscode.window.showInformationMessage(`已恢复隐藏文件显示。清单文件：${result.filePath}`);
+    await refresh("restore-hidden-tracked");
   };
 
   const openDiff = async (item?: unknown): Promise<void> => {
@@ -1113,7 +1181,11 @@ export function activate(context: vscode.ExtensionContext): void {
     interactionController.resetSession();
     await service.clearValidationCache();
     await runner.resetConnections();
+    visibleChanges = [];
+    hiddenTrackedFilePaths = [];
     treeProvider.clear();
+    void vscode.commands.executeCommand("setContext", "remoteGitDiff.hasChanges", false);
+    void vscode.commands.executeCommand("setContext", "remoteGitDiff.hasHiddenTrackedFiles", false);
     updateStatusBar("disconnected", { tooltip: "已断开连接。" });
   };
 
@@ -1128,6 +1200,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   statusBar.show();
   updateStatusBar("disconnected");
+  void vscode.commands.executeCommand("setContext", "remoteGitDiff.hasHiddenTrackedFiles", false);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("remoteGitDiff.refresh", async () => {
@@ -1142,6 +1215,8 @@ export function activate(context: vscode.ExtensionContext): void {
       logger.info("打开日志文件", { filePath });
       await vscode.window.showTextDocument(vscode.Uri.file(filePath), { preview: false });
     }),
+    vscode.commands.registerCommand("remoteGitDiff.hideCurrentTrackedChanges", hideCurrentTrackedChanges),
+    vscode.commands.registerCommand("remoteGitDiff.restoreHiddenTrackedChanges", restoreHiddenTrackedChanges),
     vscode.commands.registerCommand("remoteGitDiff.openDiff", openDiff),
     vscode.commands.registerCommand("remoteGitDiff.disconnect", disconnect),
     vscode.commands.registerCommand("remoteGitDiff.reconnect", reconnect),

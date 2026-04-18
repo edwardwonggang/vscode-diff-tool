@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
 import { ExtensionLogger } from "./logger";
 import { SshRunner } from "./sshRunner";
 import { RemoteGitChange, RemoteGitConfig, RemoteGitDiffStats, RemoteGitSettingsForm } from "./types";
@@ -6,6 +7,8 @@ import { RemoteGitChange, RemoteGitConfig, RemoteGitDiffStats, RemoteGitSettings
 function shellEscape(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
+
+const TRACKED_CHANGE_EXCLUDE_FILE_NAME = ".remote-git-diff-hidden-tracked-files.md";
 
 interface ConfigCacheEntry {
   cacheKey: string;
@@ -292,6 +295,48 @@ export class RemoteGitService {
     this.validatedConfigCache = undefined;
   }
 
+  public async readHiddenTrackedFiles(): Promise<{ filePath: string; paths: string[] }> {
+    const config = await this.getValidatedConfig();
+    const filePath = this.getTrackedChangeExcludeFilePath(config.projectPath, Boolean(config.host));
+
+    try {
+      const content = await this.readTextFile(config, filePath);
+      const paths = [...new Set(
+        content
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)
+      )].sort((left, right) => left.localeCompare(right));
+      return { filePath, paths };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/no such file|cannot find path|enoent/i.test(message)) {
+        return { filePath, paths: [] };
+      }
+      throw error;
+    }
+  }
+
+  public async addHiddenTrackedFiles(paths: string[]): Promise<{ filePath: string; paths: string[] }> {
+    const current = await this.readHiddenTrackedFiles();
+    const nextPaths = [...new Set([...current.paths, ...paths.map((item) => item.trim()).filter(Boolean)])]
+      .sort((left, right) => left.localeCompare(right));
+    await this.writeTrackedExcludeFile(current.filePath, nextPaths);
+    return {
+      filePath: current.filePath,
+      paths: nextPaths
+    };
+  }
+
+  public async clearHiddenTrackedFiles(): Promise<{ filePath: string; paths: string[] }> {
+    const current = await this.readHiddenTrackedFiles();
+    await this.writeTrackedExcludeFile(current.filePath, []);
+    return {
+      filePath: current.filePath,
+      paths: []
+    };
+  }
+
   private async getValidatedConfig(
     providedConfig?: RemoteGitConfig,
     allowCache = true
@@ -349,6 +394,52 @@ export class RemoteGitService {
 
       throw new Error(`路径 '${config.projectPath}' 不是有效的 Git 仓库。如果已设置远程主机，这里必须是服务器上的仓库路径。原始错误: ${message}`);
     }
+  }
+
+  private getTrackedChangeExcludeFilePath(projectPath: string, isRemote: boolean): string {
+    if (isRemote) {
+      const normalized = projectPath.replace(/\\/g, "/").replace(/\/+$/, "");
+      const parent = normalized.slice(0, normalized.lastIndexOf("/")) || "/";
+      return `${parent}/${TRACKED_CHANGE_EXCLUDE_FILE_NAME}`;
+    }
+
+    return path.join(path.dirname(projectPath), TRACKED_CHANGE_EXCLUDE_FILE_NAME);
+  }
+
+  private async readTextFile(config: RemoteGitConfig, absolutePath: string): Promise<string> {
+    if (!config.host) {
+      const content = await vscode.workspace.fs.readFile(vscode.Uri.file(absolutePath));
+      return Buffer.from(content).toString("utf8");
+    }
+
+    return await this.runner.runShell(
+      config,
+      `[ -f ${shellEscape(absolutePath)} ] && cat ${shellEscape(absolutePath)} || true`
+    );
+  }
+
+  private async writeTrackedExcludeFile(absolutePath: string, paths: string[]): Promise<void> {
+    const config = await this.getValidatedConfig();
+    const content = paths.join("\n");
+    if (!config.host) {
+      const fileUri = vscode.Uri.file(absolutePath);
+      await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(absolutePath)));
+      await vscode.workspace.fs.writeFile(fileUri, Buffer.from(content, "utf8"));
+      return;
+    }
+
+    const dirPath = absolutePath.slice(0, absolutePath.lastIndexOf("/")) || "/";
+    const encodedContent = Buffer.from(content, "utf8").toString("base64");
+    await this.runner.runShell(
+      config,
+      `mkdir -p ${shellEscape(dirPath)} && python - <<'PY'
+from pathlib import Path
+import base64
+
+path = Path(${shellEscape(absolutePath)})
+path.write_bytes(base64.b64decode(${shellEscape(encodedContent)}))
+PY`
+    );
   }
 
   private isAuthenticationError(message: string): boolean {
