@@ -791,6 +791,13 @@ export function activate(context: vscode.ExtensionContext): void {
     return patchDiffPanel;
   };
 
+  const closePatchDiffPanel = (): void => {
+    if (patchDiffPanel) {
+      patchDiffPanel.dispose();
+      patchDiffPanel = undefined;
+    }
+  };
+
   const openPatchDiffPanel = (change: RemoteGitChange, rows: PatchRow[], stats: RemoteGitDiffStats): void => {
     const title = change.originalPath ? `${change.originalPath} -> ${change.path}` : change.path;
     const panel = ensurePatchDiffPanel(title);
@@ -1009,15 +1016,10 @@ export function activate(context: vscode.ExtensionContext): void {
       stageTimings.statsMs = Date.now() - statsStartedAt;
       if (stats.isBinary) {
         logger.warn("检测到非文本文件，停止打开对比", { requestId: token.requestId, path: change.path });
+        closePatchDiffPanel();
         void showAutoDismissNotification("此文件为非文本文件，暂不支持左右对比。", 3000);
         return;
       }
-
-      updatePatchLoadingStage("正在读取变更信息");
-      loadingHintTimer = setTimeout(() => {
-        loadingHintVisible = true;
-        updatePatchLoadingStage("正在生成差异预览...");
-      }, 900);
 
       const sizeStartedAt = Date.now();
       const [leftLength, rightLength] = await Promise.all([
@@ -1143,6 +1145,7 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
 
+      closePatchDiffPanel();
       const headReadStartedAt = Date.now();
       const leftContent = await service.readHeadContent(change, abortController.signal);
       stageTimings.headReadMs = Date.now() - headReadStartedAt;
