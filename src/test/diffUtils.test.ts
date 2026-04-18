@@ -101,7 +101,7 @@ test("shouldUseSummaryView blocks extreme diff volumes regardless of file type",
       leftLength: 4_761_071,
       rightLength: 769_846
     }),
-    true
+    false
   );
   assert.equal(
     shouldUseSummaryView({
@@ -125,7 +125,7 @@ test("decideNativeDiff returns summary reason for extreme xml-like rewrites", ()
     }),
     {
       shouldUseNative: false,
-      reason: "summary-too-large"
+      reason: "large-change-threshold"
     }
   );
 });
@@ -154,4 +154,27 @@ test("buildPatchRows aligns deleted and added rows around a hunk", () => {
   assert.equal(rows[3].type, "add");
   assert.equal(rows[3].rightText, "line2_extra");
   assert.equal(rows[4].type, "context");
+});
+
+test("buildPatchRows truncates large patch output and appends sentinel row", () => {
+  const patch = [
+    "diff --git a/a.txt b/a.txt",
+    "index 123..456 100644",
+    "--- a/a.txt",
+    "+++ b/a.txt",
+    "@@ -1,5 +1,5 @@",
+    " line1",
+    "-line2",
+    "+line2_changed",
+    " line3",
+    "-line4",
+    "+line4_changed",
+    " line5"
+  ].join("\n");
+
+  const rows = buildPatchRows(patch, 4);
+  assert.equal(rows.length, 6);
+  assert.equal(rows[5].type, "spacer");
+  assert.equal(rows[5].leftText, "... diff truncated after 4 rows ...");
+  assert.equal(rows[5].rightText, "... diff truncated after 4 rows ...");
 });

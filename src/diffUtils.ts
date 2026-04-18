@@ -23,17 +23,22 @@ export function parseHunkHeader(header: string): { leftStart: number; rightStart
   };
 }
 
-export function buildPatchRows(patch: string): PatchRow[] {
+export function buildPatchRows(patch: string, maxRows = Number.POSITIVE_INFINITY): PatchRow[] {
   const rows: PatchRow[] = [];
   const lines = patch.split(/\r?\n/);
   let leftLine = 0;
   let rightLine = 0;
   let pendingDeletes: string[] = [];
   let pendingAdds: string[] = [];
+  let truncated = false;
 
   const flushChangedRows = (): void => {
     const count = Math.max(pendingDeletes.length, pendingAdds.length);
     for (let index = 0; index < count; index += 1) {
+      if (rows.length >= maxRows) {
+        truncated = true;
+        break;
+      }
       const deleted = pendingDeletes[index];
       const added = pendingAdds[index];
       rows.push({
@@ -49,12 +54,18 @@ export function buildPatchRows(patch: string): PatchRow[] {
   };
 
   for (const line of lines) {
+    if (truncated) {
+      break;
+    }
     if (!line || line.startsWith("diff --git ") || line.startsWith("index ") || line.startsWith("--- ") || line.startsWith("+++ ")) {
       continue;
     }
 
     if (line.startsWith("@@")) {
       flushChangedRows();
+      if (truncated) {
+        break;
+      }
       const parsed = parseHunkHeader(line);
       leftLine = parsed.leftStart;
       rightLine = parsed.rightStart;
@@ -100,6 +111,13 @@ export function buildPatchRows(patch: string): PatchRow[] {
   }
 
   flushChangedRows();
+  if (truncated) {
+    rows.push({
+      type: "spacer",
+      leftText: `... diff truncated after ${maxRows} rows ...`,
+      rightText: `... diff truncated after ${maxRows} rows ...`
+    });
+  }
   return rows;
 }
 
@@ -156,15 +174,15 @@ export function shouldUseSummaryView(input: LargeDiffSummaryInput): boolean {
   const totalChangedLines = stats.added + stats.deleted;
   const maxLength = Math.max(leftLength, rightLength);
 
-  if (totalChangedLines >= 50_000) {
+  if (totalChangedLines >= 500_000) {
     return true;
   }
 
-  if (maxLength >= 3_000_000 && totalChangedLines >= 10_000) {
+  if (maxLength >= 12_000_000 && totalChangedLines >= 250_000) {
     return true;
   }
 
-  if (maxLength >= 1_000_000 && totalChangedLines >= 25_000) {
+  if (maxLength >= 20_000_000 && totalChangedLines >= 100_000) {
     return true;
   }
 

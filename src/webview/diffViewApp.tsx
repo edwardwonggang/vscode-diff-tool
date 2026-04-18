@@ -1,5 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { diffCleanupSemantic, diffMain, DIFF_DELETE, DIFF_EQUAL, DIFF_INSERT } from "diff-match-patch-es";
 
 type PatchRow = {
   type: "context" | "delete" | "add" | "spacer";
@@ -42,6 +43,48 @@ function formatLineNumber(value?: number): string {
   return value === undefined ? "" : String(value);
 }
 
+function normalizeDiffText(value: string): string {
+  return value.replace(/\r/g, "");
+}
+
+function getInlineDiffParts(leftText: string, rightText: string): {
+  left: React.JSX.Element[];
+  right: React.JSX.Element[];
+} {
+  const diffs = diffMain(normalizeDiffText(leftText), normalizeDiffText(rightText), undefined, false);
+  diffCleanupSemantic(diffs);
+
+  const left: React.JSX.Element[] = [];
+  const right: React.JSX.Element[] = [];
+
+  diffs.forEach(([operation, text], index) => {
+    const key = `${index}-${text.length}`;
+    if (operation === DIFF_EQUAL) {
+      const node = <span key={key}>{text}</span>;
+      left.push(node);
+      right.push(node);
+      return;
+    }
+    if (operation === DIFF_DELETE) {
+      left.push(
+        <span key={key} className="inline-delete">
+          {text}
+        </span>
+      );
+      return;
+    }
+    if (operation === DIFF_INSERT) {
+      right.push(
+        <span key={key} className="inline-insert">
+          {text}
+        </span>
+      );
+    }
+  });
+
+  return { left, right };
+}
+
 function getRowClassName(row: PatchRow): string {
   if (row.type === "delete") {
     return "row-delete";
@@ -70,16 +113,21 @@ function DiffTable({ rows }: { rows: PatchRow[] }): React.JSX.Element {
       <tbody>
         {rows.map((row, index) => {
           const className = getRowClassName(row);
+          const inlineDiff =
+            className === "row-pair" && row.leftText !== undefined && row.rightText !== undefined
+              ? getInlineDiffParts(row.leftText, row.rightText)
+              : undefined;
+
           return (
             <tr key={`${index}-${row.leftLineNumber ?? "x"}-${row.rightLineNumber ?? "y"}`} className={className}>
               <td className="line-number">{formatLineNumber(row.leftLineNumber)}</td>
               <td className="code-cell left-code">
-                <span className="code-text">{row.leftText ?? ""}</span>
+                <span className="code-text">{inlineDiff ? inlineDiff.left : row.leftText ?? ""}</span>
               </td>
               <td className="split-divider" />
               <td className="line-number">{formatLineNumber(row.rightLineNumber)}</td>
               <td className="code-cell right-code">
-                <span className="code-text">{row.rightText ?? ""}</span>
+                <span className="code-text">{inlineDiff ? inlineDiff.right : row.rightText ?? ""}</span>
               </td>
             </tr>
           );
