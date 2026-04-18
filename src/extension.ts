@@ -1093,6 +1093,12 @@ export function activate(context: vscode.ExtensionContext): void {
           return;
         }
 
+        updatePatchLoadingStage("正在读取变更信息");
+        loadingHintTimer = setTimeout(() => {
+          loadingHintVisible = true;
+          updatePatchLoadingStage("正在生成差异预览...");
+        }, 900);
+
         updatePatchLoadingStage("正在读取补丁内容");
         const patchStartedAt = Date.now();
         const patch = await service.readPatch(change, PATCH_CONTEXT_LINES, abortController.signal);
@@ -1137,7 +1143,6 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
 
-      updatePatchLoadingStage("正在读取 HEAD 内容");
       const headReadStartedAt = Date.now();
       const leftContent = await service.readHeadContent(change, abortController.signal);
       stageTimings.headReadMs = Date.now() - headReadStartedAt;
@@ -1147,7 +1152,6 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
 
-      updatePatchLoadingStage("正在读取工作区内容");
       const worktreeReadStartedAt = Date.now();
       const rightContent = await service.readWorkingTreeContent(change, abortController.signal);
       stageTimings.worktreeReadMs = Date.now() - worktreeReadStartedAt;
