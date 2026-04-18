@@ -68,7 +68,7 @@ async function waitForTab(labelIncludes: string, timeoutMs = 15000): Promise<voi
     }
     await sleep(200);
   }
-  throw new Error(`未在标签页中看到 ${labelIncludes}`);
+  throw new Error(`鏈湪鏍囩椤典腑鐪嬪埌 ${labelIncludes}`);
 }
 
 function getOpenEditorLabels(): string[] {
@@ -89,7 +89,21 @@ function formatBytes(size: number): string {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+async function showAutoDismissNotification(message: string, timeoutMs = 3000): Promise<void> {
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: message,
+      cancellable: false
+    },
+    async () => {
+      await sleep(timeoutMs);
+    }
+  );
+}
+
 let patchViewStylesCache: string | undefined;
+let settingsPanelSingleton: vscode.WebviewPanel | undefined;
 
 function getPatchViewStyles(): string {
   if (patchViewStylesCache) {
@@ -239,7 +253,7 @@ function getConfigHtml(form: RemoteGitSettingsForm, suggestedPath: string): stri
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>远程 Git Diff 配置</title>
+    <title>杩滅▼ Git Diff 閰嶇疆</title>
     <style>
       body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 20px; }
       .wrap { max-width: 920px; margin: 0 auto; display: grid; gap: 16px; }
@@ -262,29 +276,29 @@ function getConfigHtml(form: RemoteGitSettingsForm, suggestedPath: string): stri
   <body>
     <div class="wrap">
       <div class="card">
-        <h1>远程 Git Diff 配置</h1>
-        <p>在这里一次性完成服务器连接、仓库路径和认证配置。保存后会长期复用，切回 VS Code 时也会自动刷新。</p>
+        <h1>杩滅▼ Git Diff 閰嶇疆</h1>
+        <p>鍦ㄨ繖閲屼竴娆℃€у畬鎴愭湇鍔″櫒杩炴帴銆佷粨搴撹矾寰勫拰璁よ瘉閰嶇疆銆備繚瀛樺悗浼氶暱鏈熷鐢紝鍒囧洖 VS Code 鏃朵篃浼氳嚜鍔ㄥ埛鏂般€?/p>
       </div>
       <div class="card">
-        <h2>连接配置</h2>
+        <h2>杩炴帴閰嶇疆</h2>
         <div class="grid">
-          <label>SSH 主机<input id="host" type="text" value="${escapeHtml(form.host)}" /></label>
-          <label>SSH 端口<input id="port" type="number" value="${String(form.port)}" /></label>
-          <label>SSH 用户名<input id="username" type="text" value="${escapeHtml(form.username)}" /></label>
-          <label>SSH 密码<input id="password" type="password" value="${escapeHtml(form.password)}" placeholder="留空表示保留已保存密码" /></label>
-          <label class="full">私钥路径<input id="privateKeyPath" type="text" value="${escapeHtml(form.privateKeyPath)}" placeholder="可选，例如 C:\\Users\\name\\.ssh\\id_rsa" /></label>
-          <label class="full">Linux 仓库路径<input id="projectPath" type="text" value="${escapeHtml(form.projectPath)}" placeholder="/home/user/src/project" /></label>
+          <label>SSH 涓绘満<input id="host" type="text" value="${escapeHtml(form.host)}" /></label>
+          <label>SSH 绔彛<input id="port" type="number" value="${String(form.port)}" /></label>
+          <label>SSH 鐢ㄦ埛鍚?input id="username" type="text" value="${escapeHtml(form.username)}" /></label>
+          <label>SSH 瀵嗙爜<input id="password" type="password" value="${escapeHtml(form.password)}" placeholder="鐣欑┖琛ㄧず淇濈暀宸蹭繚瀛樺瘑鐮? /></label>
+          <label class="full">绉侀挜璺緞<input id="privateKeyPath" type="text" value="${escapeHtml(form.privateKeyPath)}" placeholder="鍙€夛紝渚嬪 C:\\Users\\name\\.ssh\\id_rsa" /></label>
+          <label class="full">Linux 浠撳簱璺緞<input id="projectPath" type="text" value="${escapeHtml(form.projectPath)}" placeholder="/home/user/src/project" /></label>
           <div class="full row">
             <input id="strictHostKeyChecking" type="checkbox" ${form.strictHostKeyChecking ? "checked" : ""} />
-            <label for="strictHostKeyChecking">启用严格主机校验</label>
+            <label for="strictHostKeyChecking">鍚敤涓ユ牸涓绘満鏍￠獙</label>
           </div>
         </div>
-        <p class="hint">建议路径：<code id="suggestedPath">${escapeHtml(suggestedPath || "(暂无)")}</code></p>
+        <p class="hint">寤鸿璺緞锛?code id="suggestedPath">${escapeHtml(suggestedPath || "(鏆傛棤)")}</code></p>
         <div class="toolbar">
-          <button id="useSuggested" class="secondary">使用建议路径</button>
-          <button id="save" class="secondary">仅保存</button>
-          <button id="test">测试连接</button>
-          <button id="saveConnect">保存并连接</button>
+          <button id="useSuggested" class="secondary">浣跨敤寤鸿璺緞</button>
+          <button id="save" class="secondary">浠呬繚瀛?/button>
+          <button id="test">娴嬭瘯杩炴帴</button>
+          <button id="saveConnect">淇濆瓨骞惰繛鎺?/button>
         </div>
         <div id="status" class="status"></div>
       </div>
@@ -303,15 +317,15 @@ function getConfigHtml(form: RemoteGitSettingsForm, suggestedPath: string): stri
         strictHostKeyChecking: document.getElementById('strictHostKeyChecking').checked
       });
       document.getElementById('useSuggested').addEventListener('click', () => {
-        document.getElementById('projectPath').value = suggestedPath.textContent === '(暂无)' ? '' : suggestedPath.textContent;
+        document.getElementById('projectPath').value = suggestedPath.textContent === '(鏆傛棤)' ? '' : suggestedPath.textContent;
       });
       document.getElementById('save').addEventListener('click', () => vscode.postMessage({ type: 'save', form: getForm() }));
       document.getElementById('test').addEventListener('click', () => {
-        status.textContent = '正在测试连接...';
+        status.textContent = '姝ｅ湪娴嬭瘯杩炴帴...';
         vscode.postMessage({ type: 'test', form: getForm() });
       });
       document.getElementById('saveConnect').addEventListener('click', () => {
-        status.textContent = '正在保存并连接...';
+        status.textContent = '姝ｅ湪淇濆瓨骞惰繛鎺?..';
         vscode.postMessage({ type: 'saveConnect', form: getForm() });
       });
       window.addEventListener('message', (event) => {
@@ -371,7 +385,7 @@ function getLargeDiffSummaryHtml(
 ): string {
   const title = change.originalPath ? `${change.originalPath} -> ${change.path}` : change.path;
   const styles = getPatchViewStyles();
-  const patchLine = details.patchLength === undefined ? "" : `\nPatch 大小：${formatBytes(details.patchLength)}`;
+  const patchLine = details.patchLength === undefined ? "" : `\nPatch 澶у皬锛?{formatBytes(details.patchLength)}`;
 
   return `<!DOCTYPE html>
   <html lang="zh-CN">
@@ -385,20 +399,103 @@ function getLargeDiffSummaryHtml(
     <div class="app-shell">
       <div class="toolbar">
         <div class="title">${escapeHtml(title)}</div>
-        <div class="meta">超大变更摘要</div>
+        <div class="meta">瓒呭ぇ鍙樻洿鎽樿</div>
       </div>
       <div class="empty-state">
-        <div class="empty-title">该变更规模过大，已阻止加载完整自定义 Diff 以避免 VS Code 卡死。</div>
-        <pre class="empty-details">原因：${escapeHtml(details.reason)}
-新增：${stats.added} 行
-删除：${stats.deleted} 行
-HEAD 大小：${formatBytes(details.leftLength)}
-工作区大小：${formatBytes(details.rightLength)}${patchLine}
+        <div class="empty-title">璇ュ彉鏇磋妯¤繃澶э紝宸查樆姝㈠姞杞藉畬鏁磋嚜瀹氫箟 Diff 浠ラ伩鍏?VS Code 鍗℃銆?/div>
+        <pre class="empty-details">鍘熷洜锛?{escapeHtml(details.reason)}
+鏂板锛?{stats.added} 琛?
+鍒犻櫎锛?{stats.deleted} 琛?
+HEAD 澶у皬锛?{formatBytes(details.leftLength)}
+宸ヤ綔鍖哄ぇ灏忥細${formatBytes(details.rightLength)}${patchLine}
 
-建议：
-1. 先缩小变更范围后再查看
-2. 使用远端命令按目录/片段拆分 diff
-3. 对超大重写文件优先看 git diff --stat 或外部比较工具</pre>
+寤鸿锛?
+1. 鍏堢缉灏忓彉鏇磋寖鍥村悗鍐嶆煡鐪?
+2. 浣跨敤杩滅鍛戒护鎸夌洰褰?鐗囨鎷嗗垎 diff
+3. 瀵硅秴澶ч噸鍐欐枃浠朵紭鍏堢湅 git diff --stat 鎴栧閮ㄦ瘮杈冨伐鍏?/pre>
+      </div>
+    </div>
+  </body>
+  </html>`;
+}
+
+function getPatchLoadingHtml(
+  change: RemoteGitChange,
+  stageText: string,
+  details?: { slowHint?: string }
+): string {
+  const title = change.originalPath ? `${change.originalPath} -> ${change.path}` : change.path;
+  const styles = getPatchViewStyles();
+  const slowHintBlock = details?.slowHint
+    ? `<div class="loading-hint">${escapeHtml(details.slowHint)}</div>`
+    : "";
+
+  return `<!DOCTYPE html>
+  <html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      ${styles}
+      .loading-shell { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
+      .loading-body { padding: 18px 18px 24px; display: grid; gap: 16px; align-content: start; }
+      .loading-card { border: 1px solid var(--vscode-panel-border); border-radius: 10px; background: var(--vscode-editorWidget-background, var(--vscode-editor-background)); padding: 16px; display: grid; gap: 14px; }
+      .loading-header { display: flex; align-items: center; gap: 12px; }
+      .loading-spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--vscode-descriptionForeground); border-top-color: var(--vscode-progressBar-background, var(--vscode-textLink-foreground)); animation: remote-git-diff-spin 0.8s linear infinite; flex-shrink: 0; }
+      .loading-title { font-size: 13px; font-weight: 600; }
+      .loading-subtitle, .loading-hint { color: var(--vscode-descriptionForeground); font-size: 12px; }
+      .loading-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      .loading-column { border: 1px solid var(--vscode-panel-border); border-radius: 8px; overflow: hidden; }
+      .loading-column-title { padding: 8px 10px; font-size: 12px; color: var(--vscode-descriptionForeground); border-bottom: 1px solid var(--vscode-panel-border); background: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background)); }
+      .loading-lines { padding: 10px; display: grid; gap: 8px; }
+      .loading-line { height: 12px; border-radius: 999px; background: linear-gradient(90deg, var(--vscode-panel-border) 0%, var(--vscode-descriptionForeground) 50%, var(--vscode-panel-border) 100%); background-size: 220% 100%; opacity: 0.35; animation: remote-git-diff-pulse 1.4s ease-in-out infinite; }
+      .loading-line.short { width: 62%; }
+      .loading-line.medium { width: 78%; }
+      .loading-line.long { width: 94%; }
+      @keyframes remote-git-diff-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      @keyframes remote-git-diff-pulse { 0% { background-position: 100% 0; opacity: 0.25; } 50% { opacity: 0.45; } 100% { background-position: -100% 0; opacity: 0.25; } }
+    </style>
+  </head>
+  <body>
+    <div class="loading-shell">
+      <div class="toolbar">
+        <div class="title">${escapeHtml(title)}</div>
+        <div class="meta">鑷畾涔?Diff</div>
+      </div>
+      <div class="loading-body">
+        <div class="loading-card">
+          <div class="loading-header">
+            <div class="loading-spinner"></div>
+            <div>
+              <div class="loading-title">${escapeHtml(stageText)}</div>
+              <div class="loading-subtitle">澶ф枃浠舵垨澶у彉鏇翠細浼樺厛浣跨敤鎻掍欢鍐呯疆瑙嗗浘</div>
+            </div>
+          </div>
+          ${slowHintBlock}
+        </div>
+        <div class="loading-columns">
+          <div class="loading-column">
+            <div class="loading-column-title">HEAD</div>
+            <div class="loading-lines">
+              <div class="loading-line long"></div>
+              <div class="loading-line medium"></div>
+              <div class="loading-line short"></div>
+              <div class="loading-line long"></div>
+              <div class="loading-line medium"></div>
+            </div>
+          </div>
+          <div class="loading-column">
+            <div class="loading-column-title">WORKTREE</div>
+            <div class="loading-lines">
+              <div class="loading-line medium"></div>
+              <div class="loading-line long"></div>
+              <div class="loading-line short"></div>
+              <div class="loading-line medium"></div>
+              <div class="loading-line long"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </body>
@@ -410,13 +507,22 @@ async function openConfigurationPanel(
   service: RemoteGitService,
   refresh: (reason?: string) => Promise<void>
 ): Promise<void> {
+  if (settingsPanelSingleton) {
+    const form = await service.getSettingsForm();
+    const suggestedPath = service.getSuggestedProjectPath(form.host, form.username, form.projectPath);
+    settingsPanelSingleton.webview.html = getConfigHtml(form, suggestedPath);
+    settingsPanelSingleton.reveal(vscode.ViewColumn.One, false);
+    return;
+  }
+
   const panel = vscode.window.createWebviewPanel(
     "remoteGitDiff.settings",
-    "远程 Git Diff 配置",
+    "杩滅▼ Git Diff 閰嶇疆",
     vscode.ViewColumn.One,
     { enableScripts: true, retainContextWhenHidden: true }
   );
 
+  settingsPanelSingleton = panel;
   const form = await service.getSettingsForm();
   const suggestedPath = service.getSuggestedProjectPath(form.host, form.username, form.projectPath);
   panel.webview.html = getConfigHtml(form, suggestedPath);
@@ -426,24 +532,30 @@ async function openConfigurationPanel(
     try {
       if (message.type === "save") {
         await service.saveSettings(formData);
-        void panel.webview.postMessage({ type: "status", text: "配置已保存。" });
+        void panel.webview.postMessage({ type: "status", text: "閰嶇疆宸蹭繚瀛樸€? });
         return;
       }
 
       if (message.type === "test") {
         const result = await service.testConnection(formData);
-        void panel.webview.postMessage({ type: "status", text: `连接成功：\n${result}` });
+        void panel.webview.postMessage({ type: "status", text: `杩炴帴鎴愬姛锛歕n${result}` });
         return;
       }
 
       if (message.type === "saveConnect") {
         await service.saveSettings(formData);
         await refresh("save-connect");
-        void panel.webview.postMessage({ type: "status", text: "配置已保存，并已完成连接刷新。" });
+        void panel.webview.postMessage({ type: "status", text: "閰嶇疆宸蹭繚瀛橈紝骞跺凡瀹屾垚杩炴帴鍒锋柊銆? });
       }
     } catch (error) {
       const messageText = error instanceof Error ? error.message : String(error);
-      void panel.webview.postMessage({ type: "status", text: `失败：${messageText}` });
+      void panel.webview.postMessage({ type: "status", text: `澶辫触锛?{messageText}` });
+    }
+  });
+
+  panel.onDidDispose(() => {
+    if (settingsPanelSingleton === panel) {
+      settingsPanelSingleton = undefined;
     }
   });
 
@@ -466,11 +578,11 @@ async function ensureConnectionConfigured(
 
   if (!workspacePath || looksLikeWindowsWorkspace) {
     const choice = await vscode.window.showInformationMessage(
-      "当前还没有配置远程 Linux 仓库连接，是否现在打开配置页？",
-      "打开配置",
-      "取消"
+      "褰撳墠杩樻病鏈夐厤缃繙绋?Linux 浠撳簱杩炴帴锛屾槸鍚︾幇鍦ㄦ墦寮€閰嶇疆椤碉紵",
+      "鎵撳紑閰嶇疆",
+      "鍙栨秷"
     );
-    if (choice !== "打开配置") {
+    if (choice !== "鎵撳紑閰嶇疆") {
       return false;
     }
     await openConfigurationPanel(context, service, refresh);
@@ -496,11 +608,11 @@ async function suppressDiffTimeoutPrompt(logger: ExtensionLogger): Promise<void>
     ? vscode.ConfigurationTarget.Workspace
     : vscode.ConfigurationTarget.Global;
   await diffConfig.update("maxComputationTime", 0, target);
-  logger.info("已关闭 diff 超时限制提示", { target });
+  logger.info("宸插叧闂?diff 瓒呮椂闄愬埗鎻愮ず", { target });
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-  const output = vscode.window.createOutputChannel("远程 Git Diff");
+  const output = vscode.window.createOutputChannel("杩滅▼ Git Diff");
   const logger = new ExtensionLogger(output, context);
   const runner = new SshRunner(output, logger);
   const service = new RemoteGitService(runner, context.secrets, logger);
@@ -509,6 +621,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
   let refreshInFlight: Promise<void> | undefined;
   let connectionState: ConnectionState = "disconnected";
+  let pendingWarmupRefreshTimer: NodeJS.Timeout | undefined;
+  let shouldScheduleWarmupRefresh = true;
   const interactionController = new InteractionController();
   let patchDiffPanel: vscode.WebviewPanel | undefined;
   let activeDiffAbortController: AbortController | undefined;
@@ -517,6 +631,28 @@ export function activate(context: vscode.ExtensionContext): void {
   const nativeDiffHistory = new Map<string, NativeDiffHistoryEntry>(
     Object.entries(context.workspaceState.get<Record<string, NativeDiffHistoryEntry>>(NATIVE_DIFF_HISTORY_KEY, {}))
   );
+
+  const ensurePatchDiffPanel = (title: string): vscode.WebviewPanel => {
+    if (!patchDiffPanel) {
+      patchDiffPanel = vscode.window.createWebviewPanel(
+        "remoteGitDiff.patchDiff",
+        `鍙樻洿棰勮: ${title}`,
+        vscode.ViewColumn.Active,
+        {
+          enableScripts: true,
+          retainContextWhenHidden: false,
+          localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "media")]
+        }
+      );
+      patchDiffPanel.onDidDispose(() => {
+        patchDiffPanel = undefined;
+      });
+    } else {
+      patchDiffPanel.reveal(vscode.ViewColumn.Active, false);
+      patchDiffPanel.title = `鍙樻洿棰勮: ${title}`;
+    }
+    return patchDiffPanel;
+  };
 
   const persistNativeDiffHistory = async (): Promise<void> => {
     await context.workspaceState.update(
@@ -544,11 +680,19 @@ export function activate(context: vscode.ExtensionContext): void {
     output,
     statusBar,
     { dispose: () => runner.dispose() },
+    {
+      dispose: () => {
+        if (pendingWarmupRefreshTimer) {
+          clearTimeout(pendingWarmupRefreshTimer);
+          pendingWarmupRefreshTimer = undefined;
+        }
+      }
+    },
     vscode.workspace.registerTextDocumentContentProvider(REMOTE_GIT_SCHEME, contentProvider)
   );
 
   void logger.ready().then(() => {
-    logger.info("插件已激活", {
+    logger.info("鎻掍欢宸叉縺娲?, {
       workspace: vscode.workspace.workspaceFolders?.map((item) => item.uri.fsPath) ?? []
     });
   });
@@ -556,7 +700,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const showLoggedError = (message: string, error: unknown): void => {
     logger.error(message, error);
     const errorText = error instanceof Error ? error.message : String(error);
-    void vscode.window.showErrorMessage(`远程 Git Diff ${message}：${errorText}`);
+    void vscode.window.showErrorMessage(`杩滅▼ Git Diff ${message}锛?{errorText}`);
   };
 
   const isAbortError = (error: unknown): boolean => {
@@ -564,10 +708,10 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   process.on("unhandledRejection", (error) => {
-    logger.error("捕获到未处理的 Promise 异常", error);
+    logger.error("鎹曡幏鍒版湭澶勭悊鐨?Promise 寮傚父", error);
   });
   process.on("uncaughtException", (error) => {
-    logger.error("捕获到未处理的扩展异常", error);
+    logger.error("鎹曡幏鍒版湭澶勭悊鐨勬墿灞曞紓甯?, error);
   });
 
   void suppressDiffTimeoutPrompt(logger);
@@ -584,57 +728,64 @@ export function activate(context: vscode.ExtensionContext): void {
 
     switch (state) {
       case "connected": {
-        const branch = info?.branch ?? "(未知分支)";
-        const target = info?.target ?? "工作区";
+        const branch = info?.branch ?? "(鏈煡鍒嗘敮)";
+        const target = info?.target ?? "宸ヤ綔鍖?;
         statusBar.text = `$(git-branch) ${branch}  $(remote) ${target}`;
         statusBar.tooltip = info?.tooltip ?? `${branch} @ ${target}`;
         statusBar.command = "remoteGitDiff.configure";
         break;
       }
       case "connecting":
-        statusBar.text = "$(sync~spin) 正在连接远程仓库";
-        statusBar.tooltip = info?.tooltip ?? "正在连接远程仓库";
+        statusBar.text = "$(sync~spin) 姝ｅ湪杩炴帴杩滅▼浠撳簱";
+        statusBar.tooltip = info?.tooltip ?? "姝ｅ湪杩炴帴杩滅▼浠撳簱";
         statusBar.command = "remoteGitDiff.reconnect";
         break;
       case "reconnecting":
-        statusBar.text = "$(sync~spin) 正在重新连接";
-        statusBar.tooltip = info?.tooltip ?? "正在重新连接远程仓库";
+        statusBar.text = "$(sync~spin) 姝ｅ湪閲嶆柊杩炴帴";
+        statusBar.tooltip = info?.tooltip ?? "姝ｅ湪閲嶆柊杩炴帴杩滅▼浠撳簱";
         statusBar.command = "remoteGitDiff.reconnect";
         break;
       case "error":
-        statusBar.text = "$(warning) 远程 Git Diff 连接异常";
-        statusBar.tooltip = info?.tooltip ?? "点击打开配置";
+        statusBar.text = "$(warning) 杩滅▼ Git Diff 杩炴帴寮傚父";
+        statusBar.tooltip = info?.tooltip ?? "鐐瑰嚮鎵撳紑閰嶇疆";
         statusBar.command = "remoteGitDiff.configure";
         break;
       default:
-        statusBar.text = "$(debug-disconnect) 远程 Git Diff 未连接";
-        statusBar.tooltip = info?.tooltip ?? "点击打开配置";
+        statusBar.text = "$(debug-disconnect) 杩滅▼ Git Diff 鏈繛鎺?;
+        statusBar.tooltip = info?.tooltip ?? "鐐瑰嚮鎵撳紑閰嶇疆";
         statusBar.command = "remoteGitDiff.configure";
         break;
     }
   };
 
   const applyConnectionEvent = (event: SshConnectionEvent): void => {
-    logger.info("收到 SSH 状态事件", event);
+    logger.info("鏀跺埌 SSH 鐘舵€佷簨浠?, event);
     if (event.type === "connected") {
+      if (shouldScheduleWarmupRefresh && !pendingWarmupRefreshTimer) {
+        pendingWarmupRefreshTimer = setTimeout(() => {
+          pendingWarmupRefreshTimer = undefined;
+          shouldScheduleWarmupRefresh = false;
+          void refresh("warmup-after-connect");
+        }, 600);
+      }
       return;
     }
     if (event.type === "connecting") {
       updateStatusBar(connectionState === "connected" ? "reconnecting" : "connecting", {
-        tooltip: `正在连接 ${event.username}@${event.host}`
+        tooltip: `姝ｅ湪杩炴帴 ${event.username}@${event.host}`
       });
       return;
     }
     if (event.type === "timeout" || event.type === "error") {
       interactionController.resetSession();
       updateStatusBar("error", {
-        tooltip: event.reason ?? "远程连接异常"
+        tooltip: event.reason ?? "杩滅▼杩炴帴寮傚父"
       });
       return;
     }
     interactionController.resetSession();
     updateStatusBar("disconnected", {
-      tooltip: event.reason ? `连接已断开：${event.reason}` : "连接已断开"
+      tooltip: event.reason ? `杩炴帴宸叉柇寮€锛?{event.reason}` : "杩炴帴宸叉柇寮€"
     });
   };
 
@@ -642,25 +793,18 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const openPatchDiffPanel = (change: RemoteGitChange, rows: PatchRow[], stats: RemoteGitDiffStats): void => {
     const title = change.originalPath ? `${change.originalPath} -> ${change.path}` : change.path;
-    if (!patchDiffPanel) {
-      patchDiffPanel = vscode.window.createWebviewPanel(
-        "remoteGitDiff.patchDiff",
-        `变更预览: ${title}`,
-        vscode.ViewColumn.Active,
-        {
-          enableScripts: true,
-          retainContextWhenHidden: false,
-          localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "media")]
-        }
-      );
-      patchDiffPanel.onDidDispose(() => {
-        patchDiffPanel = undefined;
-      });
-    } else {
-      patchDiffPanel.reveal(vscode.ViewColumn.Active, false);
-      patchDiffPanel.title = `变更预览: ${title}`;
-    }
-    patchDiffPanel.webview.html = getPatchDiffHtml(patchDiffPanel.webview, context.extensionUri, change, rows, stats);
+    const panel = ensurePatchDiffPanel(title);
+    panel.webview.html = getPatchDiffHtml(panel.webview, context.extensionUri, change, rows, stats);
+  };
+
+  const openPatchLoadingPanel = (
+    change: RemoteGitChange,
+    stageText: string,
+    details?: { slowHint?: string }
+  ): void => {
+    const title = change.originalPath ? `${change.originalPath} -> ${change.path}` : change.path;
+    const panel = ensurePatchDiffPanel(title);
+    panel.webview.html = getPatchLoadingHtml(change, stageText, details);
   };
 
   const openLargeDiffSummaryPanel = (
@@ -669,24 +813,8 @@ export function activate(context: vscode.ExtensionContext): void {
     details: { leftLength: number; rightLength: number; reason: string; patchLength?: number }
   ): void => {
     const title = change.originalPath ? `${change.originalPath} -> ${change.path}` : change.path;
-    if (!patchDiffPanel) {
-      patchDiffPanel = vscode.window.createWebviewPanel(
-        "remoteGitDiff.patchDiff",
-        `鍙樻洿棰勮: ${title}`,
-        vscode.ViewColumn.Active,
-        {
-          enableScripts: false,
-          retainContextWhenHidden: false
-        }
-      );
-      patchDiffPanel.onDidDispose(() => {
-        patchDiffPanel = undefined;
-      });
-    } else {
-      patchDiffPanel.reveal(vscode.ViewColumn.Active, false);
-      patchDiffPanel.title = `鍙樻洿棰勮: ${title}`;
-    }
-    patchDiffPanel.webview.html = getLargeDiffSummaryHtml(change, stats, details);
+    const panel = ensurePatchDiffPanel(title);
+    panel.webview.html = getLargeDiffSummaryHtml(change, stats, details);
   };
 
   const refresh = async (reason = "manual"): Promise<void> => {
@@ -698,12 +826,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
     refreshInFlight = (async () => {
       try {
-        logger.info("开始刷新远程变更", { reason });
+        logger.info("寮€濮嬪埛鏂拌繙绋嬪彉鏇?, { reason });
         updateStatusBar(connectionState === "connected" ? "reconnecting" : "connecting");
 
         const ready = await ensureConnectionConfigured(context, service, refresh);
         if (!ready) {
-          updateStatusBar("disconnected", { tooltip: "尚未完成远程连接配置。" });
+          updateStatusBar("disconnected", { tooltip: "灏氭湭瀹屾垚杩滅▼杩炴帴閰嶇疆銆? });
           return;
         }
 
@@ -714,10 +842,10 @@ export function activate(context: vscode.ExtensionContext): void {
         const hiddenPathSet = new Set(hiddenTrackedFilePaths);
         const filteredChanges = changes.filter((change) => !hiddenPathSet.has(change.path));
         const branch = await service.getCurrentBranch(config);
-        const target = config.host ? `${config.username}@${config.host}` : "工作区";
+        const target = config.host ? `${config.username}@${config.host}` : "宸ヤ綔鍖?;
 
         if (!interactionController.isLatestRefreshRequest(refreshToken)) {
-          logger.info("放弃过期的刷新结果", { reason });
+          logger.info("鏀惧純杩囨湡鐨勫埛鏂扮粨鏋?, { reason });
           return;
         }
 
@@ -728,9 +856,9 @@ export function activate(context: vscode.ExtensionContext): void {
         updateStatusBar("connected", {
           branch,
           target,
-          tooltip: `${config.projectPath}\n分支：${branch}\n变更数：${changes.length}\n刷新来源：${reason}`
+          tooltip: `${config.projectPath}\n鍒嗘敮锛?{branch}\n鍙樻洿鏁帮細${changes.length}\n鍒锋柊鏉ユ簮锛?{reason}`
         });
-        logger.info("刷新远程变更完成", { reason, count: changes.length, branch, target });
+        logger.info("鍒锋柊杩滅▼鍙樻洿瀹屾垚", { reason, count: changes.length, branch, target });
       } catch (error) {
         visibleChanges = [];
         hiddenTrackedFilePaths = [];
@@ -738,9 +866,9 @@ export function activate(context: vscode.ExtensionContext): void {
         await vscode.commands.executeCommand("setContext", "remoteGitDiff.hasChanges", false);
         await vscode.commands.executeCommand("setContext", "remoteGitDiff.hasHiddenTrackedFiles", false);
         const message = error instanceof Error ? error.message : String(error);
-        logger.error("刷新远程变更失败", error);
+        logger.error("鍒锋柊杩滅▼鍙樻洿澶辫触", error);
         updateStatusBar("error", { tooltip: message });
-        void vscode.window.showErrorMessage(`远程 Git Diff 刷新失败：${message}`);
+        void vscode.window.showErrorMessage(`杩滅▼ Git Diff 鍒锋柊澶辫触锛?{message}`);
       } finally {
         refreshInFlight = undefined;
       }
@@ -753,102 +881,102 @@ export function activate(context: vscode.ExtensionContext): void {
     if (isConnectedState(connectionState)) {
       return;
     }
-    logger.info("打开对比前执行连接预检", { connectionState });
+    logger.info("鎵撳紑瀵规瘮鍓嶆墽琛岃繛鎺ラ妫€", { connectionState });
     await refresh("open-diff-preflight");
     if (!isConnectedState(connectionState)) {
-      throw new Error("当前远程连接不可用，请稍后重试。");
+      throw new Error("褰撳墠杩滅▼杩炴帴涓嶅彲鐢紝璇风◢鍚庨噸璇曘€?);
     }
   };
 
   const hideCurrentTrackedChanges = async (): Promise<void> => {
     await ensureConnectedForOpenDiff();
     if (visibleChanges.length === 0) {
-      void vscode.window.showInformationMessage("当前没有可隐藏的 tracked 变更。");
+      void vscode.window.showInformationMessage("褰撳墠娌℃湁鍙殣钘忕殑 tracked 鍙樻洿銆?);
       return;
     }
 
     const choice = await vscode.window.showWarningMessage(
-      `将当前 ${visibleChanges.length} 个 tracked 变更写入项目级隐藏清单，后续插件不再显示，是否继续？`,
+      `灏嗗綋鍓?${visibleChanges.length} 涓?tracked 鍙樻洿鍐欏叆椤圭洰绾ч殣钘忔竻鍗曪紝鍚庣画鎻掍欢涓嶅啀鏄剧ず锛屾槸鍚︾户缁紵`,
       { modal: true },
-      "继续",
-      "取消"
+      "缁х画",
+      "鍙栨秷"
     );
-    if (choice !== "继续") {
+    if (choice !== "缁х画") {
       return;
     }
 
     const result = await service.addHiddenTrackedFiles(visibleChanges.map((change) => change.path));
     hiddenTrackedFilePaths = result.paths;
-    logger.info("已更新 tracked 隐藏清单", {
+    logger.info("宸叉洿鏂?tracked 闅愯棌娓呭崟", {
       addedCount: visibleChanges.length,
       totalHiddenCount: result.paths.length,
       filePath: result.filePath
     });
-    void vscode.window.showInformationMessage(`已隐藏当前变更。清单文件：${result.filePath}`);
+    void vscode.window.showInformationMessage(`宸查殣钘忓綋鍓嶅彉鏇淬€傛竻鍗曟枃浠讹細${result.filePath}`);
     await refresh("hide-tracked");
   };
 
   const restoreHiddenTrackedChanges = async (): Promise<void> => {
     await ensureConnectedForOpenDiff();
     if (hiddenTrackedFilePaths.length === 0) {
-      void vscode.window.showInformationMessage("当前没有已隐藏的 tracked 文件。");
+      void vscode.window.showInformationMessage("褰撳墠娌℃湁宸查殣钘忕殑 tracked 鏂囦欢銆?);
       return;
     }
 
     const restoredCount = hiddenTrackedFilePaths.length;
     const choice = await vscode.window.showWarningMessage(
-      `将清空当前项目的隐藏清单，并恢复 ${restoredCount} 个 tracked 文件显示，是否继续？`,
+      `灏嗘竻绌哄綋鍓嶉」鐩殑闅愯棌娓呭崟锛屽苟鎭㈠ ${restoredCount} 涓?tracked 鏂囦欢鏄剧ず锛屾槸鍚︾户缁紵`,
       { modal: true },
-      "恢复",
-      "取消"
+      "鎭㈠",
+      "鍙栨秷"
     );
-    if (choice !== "恢复") {
+    if (choice !== "鎭㈠") {
       return;
     }
 
     const result = await service.clearHiddenTrackedFiles();
     hiddenTrackedFilePaths = result.paths;
-    logger.info("已清空 tracked 隐藏清单", {
+    logger.info("宸叉竻绌?tracked 闅愯棌娓呭崟", {
       restoredCount,
       filePath: result.filePath
     });
-    void vscode.window.showInformationMessage(`已恢复隐藏文件显示。清单文件：${result.filePath}`);
+    void vscode.window.showInformationMessage(`宸叉仮澶嶉殣钘忔枃浠舵樉绀恒€傛竻鍗曟枃浠讹細${result.filePath}`);
     await refresh("restore-hidden-tracked");
   };
 
   const stageAllVisibleChanges = async (): Promise<void> => {
     await ensureConnectedForOpenDiff();
     if (hiddenTrackedFilePaths.length === 0) {
-      void vscode.window.showInformationMessage("隐藏列表为空，暂不允许一键添加所有变更。");
+      void vscode.window.showInformationMessage("闅愯棌鍒楄〃涓虹┖锛屾殏涓嶅厑璁镐竴閿坊鍔犳墍鏈夊彉鏇淬€?);
       return;
     }
     if (visibleChanges.length === 0) {
-      void vscode.window.showInformationMessage("当前没有可添加的变更。");
+      void vscode.window.showInformationMessage("褰撳墠娌℃湁鍙坊鍔犵殑鍙樻洿銆?);
       return;
     }
 
     const choice = await vscode.window.showWarningMessage(
-      `将当前 ${visibleChanges.length} 个可见变更全部执行 git add，是否继续？`,
+      `灏嗗綋鍓?${visibleChanges.length} 涓彲瑙佸彉鏇村叏閮ㄦ墽琛?git add锛屾槸鍚︾户缁紵`,
       { modal: true },
-      "继续",
-      "取消"
+      "缁х画",
+      "鍙栨秷"
     );
-    if (choice !== "继续") {
+    if (choice !== "缁х画") {
       return;
     }
 
     const stagedCount = await service.stageTrackedChanges(visibleChanges.map((change) => change.path));
-    logger.info("已一键添加当前可见变更", {
+    logger.info("宸蹭竴閿坊鍔犲綋鍓嶅彲瑙佸彉鏇?, {
       stagedCount,
       hiddenCount: hiddenTrackedFilePaths.length
     });
-    void vscode.window.showInformationMessage(`已添加 ${stagedCount} 个可见变更。`);
+    void vscode.window.showInformationMessage(`宸叉坊鍔?${stagedCount} 涓彲瑙佸彉鏇淬€俙);
     await refresh("stage-visible-tracked");
   };
 
   const openDiff = async (item?: unknown): Promise<void> => {
     if (!isRemoteGitChange(item)) {
-      logger.warn("忽略非文件节点的打开对比请求", item);
+      logger.warn("蹇界暐闈炴枃浠惰妭鐐圭殑鎵撳紑瀵规瘮璇锋眰", item);
       return;
     }
 
@@ -857,19 +985,36 @@ export function activate(context: vscode.ExtensionContext): void {
     activeDiffAbortController = abortController;
     const token = interactionController.beginDiffRequest();
     const change = item;
+    let loadingHintTimer: NodeJS.Timeout | undefined;
+    let loadingHintVisible = false;
+    const updatePatchLoadingStage = (stageText: string): void => {
+      if (!interactionController.isLatestDiffRequest(token)) {
+        return;
+      }
+      openPatchLoadingPanel(
+        change,
+        stageText,
+        loadingHintVisible ? { slowHint: "鏂囦欢杈冨ぇ锛屼粛鍦ㄧ户缁鐞嗭紝璇风◢鍊欍€? } : undefined
+      );
+    };
 
     try {
       const openStartedAt = Date.now();
       const stageTimings: Record<string, number> = {};
       await ensureConnectedForOpenDiff();
-      logger.info("开始打开对比", { requestId: token.requestId, path: change.path, originalPath: change.originalPath });
+      updatePatchLoadingStage("姝ｅ湪璇诲彇鍙樻洿缁熻");
+      loadingHintTimer = setTimeout(() => {
+        loadingHintVisible = true;
+        updatePatchLoadingStage("姝ｅ湪缁х画澶勭悊澶ф枃浠?);
+      }, 900);
+      logger.info("寮€濮嬫墦寮€瀵规瘮", { requestId: token.requestId, path: change.path, originalPath: change.originalPath });
 
       const statsStartedAt = Date.now();
       const stats = await service.getDiffStats(change, abortController.signal);
       stageTimings.statsMs = Date.now() - statsStartedAt;
       if (stats.isBinary) {
-        logger.warn("检测到非文本文件，停止打开对比", { requestId: token.requestId, path: change.path });
-        void vscode.window.showInformationMessage("此文件为非文本文件，暂不支持左右对比。");
+        logger.warn("妫€娴嬪埌闈炴枃鏈枃浠讹紝鍋滄鎵撳紑瀵规瘮", { requestId: token.requestId, path: change.path });
+        void showAutoDismissNotification("姝ゆ枃浠朵负闈炴枃鏈枃浠讹紝鏆備笉鏀寔宸﹀彸瀵规瘮銆?, 3000);
         return;
       }
 
@@ -881,7 +1026,7 @@ export function activate(context: vscode.ExtensionContext): void {
       stageTimings.sizeMs = Date.now() - sizeStartedAt;
 
       if (!interactionController.isLatestDiffRequest(token)) {
-        logger.info("放弃过期的对比请求", { requestId: token.requestId, path: change.path });
+        logger.info("鏀惧純杩囨湡鐨勫姣旇姹?, { requestId: token.requestId, path: change.path });
         return;
       }
 
@@ -908,7 +1053,7 @@ export function activate(context: vscode.ExtensionContext): void {
       });
       const usePatchView = !nativeDecision.shouldUseNative;
 
-      logger.info("准备打开对比", {
+      logger.info("鍑嗗鎵撳紑瀵规瘮", {
         requestId: token.requestId,
         path: change.path,
         leftLength,
@@ -926,8 +1071,9 @@ export function activate(context: vscode.ExtensionContext): void {
       });
 
       if (usePatchView) {
+        updatePatchLoadingStage("姝ｅ湪鐢熸垚鑷畾涔?Diff");
         if (nativeDecision.reason === "summary-too-large") {
-          logger.warn("变更过大，改为摘要视图", {
+          logger.warn("鍙樻洿杩囧ぇ锛屾敼涓烘憳瑕佽鍥?, {
             requestId: token.requestId,
             path: change.path,
             leftLength,
@@ -942,22 +1088,23 @@ export function activate(context: vscode.ExtensionContext): void {
           openLargeDiffSummaryPanel(change, stats, {
             leftLength,
             rightLength,
-            reason: "变更规模超过安全阈值，已阻止加载完整补丁。"
+            reason: "鍙樻洿瑙勬ā瓒呰繃瀹夊叏闃堝€硷紝宸查樆姝㈠姞杞藉畬鏁磋ˉ涓併€?
           });
           return;
         }
 
+        updatePatchLoadingStage("姝ｅ湪鑾峰彇鏂囦欢鍐呭");
         const patchStartedAt = Date.now();
         const patch = await service.readPatch(change, PATCH_CONTEXT_LINES, abortController.signal);
         stageTimings.patchMs = Date.now() - patchStartedAt;
         if (!interactionController.isLatestDiffRequest(token)) {
-          logger.info("放弃过期的 patch 预览请求", { requestId: token.requestId, path: change.path });
+          logger.info("鏀惧純杩囨湡鐨?patch 棰勮璇锋眰", { requestId: token.requestId, path: change.path });
           return;
         }
-        logger.info("改用补丁差异视图", { requestId: token.requestId, path: change.path });
+        logger.info("鏀圭敤琛ヤ竵宸紓瑙嗗浘", { requestId: token.requestId, path: change.path });
         const patchLength = Buffer.byteLength(patch, "utf8");
         if (patchLength > MAX_PATCH_BYTES_FOR_WEBVIEW) {
-          logger.warn("补丁内容过大，改为摘要视图", {
+          logger.warn("琛ヤ竵鍐呭杩囧ぇ锛屾敼涓烘憳瑕佽鍥?, {
             requestId: token.requestId,
             path: change.path,
             patchLength
@@ -970,11 +1117,12 @@ export function activate(context: vscode.ExtensionContext): void {
             leftLength,
             rightLength,
             patchLength,
-            reason: `补丁过大（>${formatBytes(MAX_PATCH_BYTES_FOR_WEBVIEW)}），继续加载会明显增加 VS Code 卡顿风险。`
+            reason: `琛ヤ竵杩囧ぇ锛?${formatBytes(MAX_PATCH_BYTES_FOR_WEBVIEW)}锛夛紝缁х画鍔犺浇浼氭槑鏄惧鍔?VS Code 鍗￠】椋庨櫓銆俙
           });
           return;
         }
         const rows = buildPatchRows(patch, MAX_PATCH_ROWS_FOR_WEBVIEW);
+        updatePatchLoadingStage("姝ｅ湪娓叉煋椤甸潰");
         logger.info("patch view timing", {
           requestId: token.requestId,
           path: change.path,
@@ -989,6 +1137,10 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
 
+      if (patchDiffPanel) {
+        patchDiffPanel.dispose();
+        patchDiffPanel = undefined;
+      }
       const headReadStartedAt = Date.now();
       const leftContent = await service.readHeadContent(change, abortController.signal);
       stageTimings.headReadMs = Date.now() - headReadStartedAt;
@@ -1016,32 +1168,35 @@ export function activate(context: vscode.ExtensionContext): void {
         ? `${change.originalPath} -> ${change.path}`
         : change.path;
 
-      logger.info("触发 VS Code 原生左右对比", {
+      logger.info("瑙﹀彂 VS Code 鍘熺敓宸﹀彸瀵规瘮", {
         requestId: token.requestId,
         path: change.path,
         title,
-        preview: false,
+        preview: true,
         stageTimings
       });
 
       const nativeDiffStartedAt = Date.now();
-      await vscode.commands.executeCommand("vscode.diff", leftUri, rightUri, title, { preview: false });
+      await vscode.commands.executeCommand("vscode.diff", leftUri, rightUri, title, { preview: true });
       stageTimings.nativeDiffMs = Date.now() - nativeDiffStartedAt;
       await rememberNativeDiffOutcome(change, {
         lastDurationMs: stageTimings.nativeDiffMs,
         timedOut: false,
         lastReason: "native-ok"
       });
-      logger.info("VS Code 左右对比命令已返回", { requestId: token.requestId, path: change.path });
+      logger.info("VS Code 宸﹀彸瀵规瘮鍛戒护宸茶繑鍥?, { requestId: token.requestId, path: change.path });
     } catch (error) {
       if (isAbortError(error)) {
-        logger.info("已取消过期对比请求", { requestId: token.requestId, path: change.path });
+        logger.info("宸插彇娑堣繃鏈熷姣旇姹?, { requestId: token.requestId, path: change.path });
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
       updateStatusBar("error", { tooltip: message });
-      showLoggedError("打开失败", error);
+      showLoggedError("鎵撳紑澶辫触", error);
     } finally {
+      if (loadingHintTimer) {
+        clearTimeout(loadingHintTimer);
+      }
       if (activeDiffAbortController === abortController) {
         activeDiffAbortController = undefined;
       }
@@ -1059,7 +1214,7 @@ export function activate(context: vscode.ExtensionContext): void {
       .map((item) => item.trim())
       .filter(Boolean);
 
-    logger.info("[SELF-TEST] 启动自测开始", { runId, requestedFiles });
+    logger.info("[SELF-TEST] 鍚姩鑷祴寮€濮?, { runId, requestedFiles });
 
     try {
       await vscode.commands.executeCommand("workbench.view.extension.remoteGitDiff");
@@ -1071,7 +1226,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const selectedChanges = requestedFiles.length > 0
         ? changes.filter((change) => requestedFiles.includes(change.path))
         : changes;
-      logger.info("[SELF-TEST] 本次选中文件", {
+      logger.info("[SELF-TEST] 鏈閫変腑鏂囦欢", {
         runId,
         selectedCount: selectedChanges.length,
         samplePaths: selectedChanges.slice(0, 10).map((item) => item.path)
@@ -1084,7 +1239,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const stats = await service.getDiffStats(change);
         const startedAt = Date.now();
         const beforeLabels = new Set(getOpenEditorLabels());
-        logger.info("[SELF-TEST] 开始打开对比", {
+        logger.info("[SELF-TEST] 寮€濮嬫墦寮€瀵规瘮", {
           runId,
           path: change.path,
           status: change.status,
@@ -1097,7 +1252,7 @@ export function activate(context: vscode.ExtensionContext): void {
         await withTimeout(
           openDiff(change),
           SELF_TEST_OPEN_DIFF_TIMEOUT_MS,
-          `自测打开对比超时: ${change.path}`
+          `鑷祴鎵撳紑瀵规瘮瓒呮椂: ${change.path}`
         );
 
         if (stats.isBinary) {
@@ -1111,7 +1266,7 @@ export function activate(context: vscode.ExtensionContext): void {
             deleted: stats.deleted,
             opened: false
           });
-          logger.info("[SELF-TEST] 非文本文件已验证", {
+          logger.info("[SELF-TEST] 闈炴枃鏈枃浠跺凡楠岃瘉", {
             runId,
             path: change.path,
             durationMs
@@ -1132,7 +1287,7 @@ export function activate(context: vscode.ExtensionContext): void {
           opened: true,
           newLabels
         });
-        logger.info("[SELF-TEST] 打开对比成功", {
+        logger.info("[SELF-TEST] 鎵撳紑瀵规瘮鎴愬姛", {
           runId,
           path: change.path,
           durationMs,
@@ -1150,7 +1305,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
       const rapidSwitchTargets = textChanges.slice(0, Math.min(textChanges.length, 12));
       if (rapidSwitchTargets.length > 0) {
-        logger.info("[SELF-TEST] 开始快速切换压力测试", {
+        logger.info("[SELF-TEST] 寮€濮嬪揩閫熷垏鎹㈠帇鍔涙祴璇?, {
           runId,
           count: rapidSwitchTargets.length,
           paths: rapidSwitchTargets.map((item) => item.path)
@@ -1162,7 +1317,7 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         const expectedLast = rapidSwitchTargets[rapidSwitchTargets.length - 1];
         await waitForTab(getFileName(expectedLast.path), 30000);
-        logger.info("[SELF-TEST] 快速切换压力测试完成", {
+        logger.info("[SELF-TEST] 蹇€熷垏鎹㈠帇鍔涙祴璇曞畬鎴?, {
           runId,
           count: rapidSwitchTargets.length,
           durationMs: Date.now() - rapidStartedAt,
@@ -1183,7 +1338,7 @@ export function activate(context: vscode.ExtensionContext): void {
         return Number(item.durationMs) > Number(current.durationMs) ? item : current;
       }, undefined);
 
-      logger.info("[SELF-TEST] 项目级汇总", {
+      logger.info("[SELF-TEST] 椤圭洰绾ф眹鎬?, {
         runId,
         totalChanges: selectedChanges.length,
         testedChanges: sequentialResults.length,
@@ -1193,13 +1348,13 @@ export function activate(context: vscode.ExtensionContext): void {
         maxDurationMs: maxItem ? Number(maxItem.durationMs) : 0,
         slowestPath: maxItem?.path ?? ""
       });
-      logger.info("[SELF-TEST] 项目级明细", {
+      logger.info("[SELF-TEST] 椤圭洰绾ф槑缁?, {
         runId,
         results: sequentialResults
       });
-      logger.info("[SELF-TEST] 启动自测完成", { runId });
+      logger.info("[SELF-TEST] 鍚姩鑷祴瀹屾垚", { runId });
     } catch (error) {
-      logger.error("[SELF-TEST] 启动自测失败", {
+      logger.error("[SELF-TEST] 鍚姩鑷祴澶辫触", {
         runId,
         error: error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error)
       });
@@ -1207,23 +1362,33 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   const disconnect = async (): Promise<void> => {
-    logger.info("手动断开连接");
+    logger.info("鎵嬪姩鏂紑杩炴帴");
     interactionController.resetSession();
     await service.clearValidationCache();
     await runner.resetConnections();
+    shouldScheduleWarmupRefresh = true;
+    if (pendingWarmupRefreshTimer) {
+      clearTimeout(pendingWarmupRefreshTimer);
+      pendingWarmupRefreshTimer = undefined;
+    }
     visibleChanges = [];
     hiddenTrackedFilePaths = [];
     treeProvider.clear();
     void vscode.commands.executeCommand("setContext", "remoteGitDiff.hasChanges", false);
     void vscode.commands.executeCommand("setContext", "remoteGitDiff.hasHiddenTrackedFiles", false);
-    updateStatusBar("disconnected", { tooltip: "已断开连接。" });
+    updateStatusBar("disconnected", { tooltip: "宸叉柇寮€杩炴帴銆? });
   };
 
   const reconnect = async (): Promise<void> => {
-    logger.info("手动重新连接");
+    logger.info("鎵嬪姩閲嶆柊杩炴帴");
     interactionController.resetSession();
     await service.clearValidationCache();
     await runner.resetConnections();
+    shouldScheduleWarmupRefresh = true;
+    if (pendingWarmupRefreshTimer) {
+      clearTimeout(pendingWarmupRefreshTimer);
+      pendingWarmupRefreshTimer = undefined;
+    }
     updateStatusBar("reconnecting");
     await refresh("reconnect");
   };
@@ -1242,7 +1407,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("remoteGitDiff.openLogFile", async () => {
       await logger.ready();
       const filePath = logger.getLogFilePath();
-      logger.info("打开日志文件", { filePath });
+      logger.info("鎵撳紑鏃ュ織鏂囦欢", { filePath });
       await vscode.window.showTextDocument(vscode.Uri.file(filePath), { preview: false });
     }),
     vscode.commands.registerCommand("remoteGitDiff.stageAllVisibleChanges", stageAllVisibleChanges),
@@ -1276,5 +1441,5 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
-  // 由 subscriptions 统一释放
+  // 鐢?subscriptions 缁熶竴閲婃斁
 }
