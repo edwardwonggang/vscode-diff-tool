@@ -1,0 +1,218 @@
+{
+  "name": "remote-git-diff-tool",
+  "displayName": "Remote Git Diff Tool",
+  "description": "通过 SSH 浏览远程 Linux 仓库的 Git 变更，并在 VS Code 中直接打开左右对比。",
+  "version": "0.0.1",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.89.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "files": [
+    "out",
+    "media",
+    "node_modules",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "categories": [
+    "SCM",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:remoteGitDiff.changes",
+    "onCommand:remoteGitDiff.refresh",
+    "onCommand:remoteGitDiff.configure",
+    "onCommand:remoteGitDiff.openDiff"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "remoteGitDiff",
+          "title": "Remote Git Diff",
+          "icon": "$(diff)"
+        }
+      ]
+    },
+    "views": {
+      "remoteGitDiff": [
+        {
+          "id": "remoteGitDiff.changes",
+          "name": "Changes"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "remoteGitDiff.refresh",
+        "title": "刷新远程 Git 变更",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "remoteGitDiff.configure",
+        "title": "打开远程 Git Diff 配置",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "remoteGitDiff.openDiff",
+        "title": "打开差异对比",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "remoteGitDiff.reconnect",
+        "title": "重新连接远程 Git",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "remoteGitDiff.disconnect",
+        "title": "断开远程 Git 连接",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "remoteGitDiff.openLogFile",
+        "title": "打开远程 Git Diff 日志",
+        "icon": "$(output)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "remoteGitDiff.refresh",
+          "when": "view == remoteGitDiff.changes",
+          "group": "navigation"
+        },
+        {
+          "command": "remoteGitDiff.configure",
+          "when": "view == remoteGitDiff.changes",
+          "group": "navigation"
+        },
+        {
+          "command": "remoteGitDiff.reconnect",
+          "when": "view == remoteGitDiff.changes",
+          "group": "navigation"
+        },
+        {
+          "command": "remoteGitDiff.disconnect",
+          "when": "view == remoteGitDiff.changes && remoteGitDiff.connectionState == connected",
+          "group": "navigation"
+        },
+        {
+          "command": "remoteGitDiff.openLogFile",
+          "when": "view == remoteGitDiff.changes",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "remoteGitDiff.openDiff",
+          "when": "view == remoteGitDiff.changes && viewItem == remoteGitDiff.change",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Remote Git Diff Tool",
+      "properties": {
+        "remoteGitDiff.host": {
+          "type": "string",
+          "default": "",
+          "description": "远程 Linux 服务器的 SSH 主机名或 IP。"
+        },
+        "remoteGitDiff.port": {
+          "type": "number",
+          "default": 22,
+          "description": "远程 Linux 服务器的 SSH 端口。"
+        },
+        "remoteGitDiff.username": {
+          "type": "string",
+          "default": "",
+          "description": "连接远程 Linux 服务器所使用的 SSH 用户名。"
+        },
+        "remoteGitDiff.projectPath": {
+          "type": "string",
+          "default": "",
+          "description": "远程 Linux 服务器上的 Git 仓库绝对路径。只有当前 VS Code 工作区本身就是真实仓库路径时才可以留空。"
+        },
+        "remoteGitDiff.privateKeyPath": {
+          "type": "string",
+          "default": "",
+          "description": "可选，本地私钥文件路径。配置页也可以直接保存。"
+        },
+        "remoteGitDiff.strictHostKeyChecking": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用 SSH 严格主机校验。"
+        },
+        "remoteGitDiff.autoRefreshOnFocus": {
+          "type": "boolean",
+          "default": true,
+          "description": "当 VS Code 重新获得焦点，或远程 Git Diff 视图重新可见时，自动刷新变更。"
+        },
+        "remoteGitDiff.disableDiffTimeoutPrompt": {
+          "type": "boolean",
+          "default": true,
+          "description": "默认将当前工作区的 diffEditor.maxComputationTime 设为 0，避免 VS Code 显示 5 秒超时提示。"
+        },
+        "remoteGitDiff.diffViewMode": {
+          "type": "string",
+          "default": "native",
+          "enum": [
+            "native",
+            "auto"
+          ],
+          "description": "差异展示模式。native 始终使用 VS Code 原生左右对比；auto 才允许超大变更切换到插件内置预览。"
+        },
+        "remoteGitDiff.largeDiffThresholdBytes": {
+          "type": "number",
+          "default": 250000,
+          "description": "文件内容超过该大小时，才会进一步评估是否切换到补丁差异视图。"
+        },
+        "remoteGitDiff.largeChangeThresholdLines": {
+          "type": "number",
+          "default": 200,
+          "description": "当新增行数与删除行数总和超过该值，且文件内容也较大时，使用补丁差异视图。"
+        },
+        "remoteGitDiff.statusArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "--untracked-files=no"
+          ],
+          "description": "附加到 git status 后面的额外参数。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build-webview.js && tsc -p ./",
+    "test": "npm run build && node --test out/test/diffUtils.test.js out/test/interactionController.test.js",
+    "visual-test": "node scripts/run-visual-validation.js",
+    "watch": "tsc -watch -p ./",
+    "package": "npm run build && npx @vscode/vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/ssh2": "^1.15.5",
+    "@types/vscode": "^1.89.0",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "react": "^19.2.5",
+    "react-diff-view": "^3.3.3",
+    "react-dom": "^19.2.5",
+    "ssh2": "^1.16.0"
+  }
+}
