@@ -816,6 +816,36 @@ export function activate(context: vscode.ExtensionContext): void {
     await refresh("restore-hidden-tracked");
   };
 
+  const stageAllVisibleChanges = async (): Promise<void> => {
+    await ensureConnectedForOpenDiff();
+    if (hiddenTrackedFilePaths.length === 0) {
+      void vscode.window.showInformationMessage("隐藏列表为空，暂不允许一键添加所有变更。");
+      return;
+    }
+    if (visibleChanges.length === 0) {
+      void vscode.window.showInformationMessage("当前没有可添加的变更。");
+      return;
+    }
+
+    const choice = await vscode.window.showWarningMessage(
+      `将当前 ${visibleChanges.length} 个可见变更全部执行 git add，是否继续？`,
+      { modal: true },
+      "继续",
+      "取消"
+    );
+    if (choice !== "继续") {
+      return;
+    }
+
+    const stagedCount = await service.stageTrackedChanges(visibleChanges.map((change) => change.path));
+    logger.info("已一键添加当前可见变更", {
+      stagedCount,
+      hiddenCount: hiddenTrackedFilePaths.length
+    });
+    void vscode.window.showInformationMessage(`已添加 ${stagedCount} 个可见变更。`);
+    await refresh("stage-visible-tracked");
+  };
+
   const openDiff = async (item?: unknown): Promise<void> => {
     if (!isRemoteGitChange(item)) {
       logger.warn("忽略非文件节点的打开对比请求", item);
@@ -1215,6 +1245,7 @@ export function activate(context: vscode.ExtensionContext): void {
       logger.info("打开日志文件", { filePath });
       await vscode.window.showTextDocument(vscode.Uri.file(filePath), { preview: false });
     }),
+    vscode.commands.registerCommand("remoteGitDiff.stageAllVisibleChanges", stageAllVisibleChanges),
     vscode.commands.registerCommand("remoteGitDiff.hideCurrentTrackedChanges", hideCurrentTrackedChanges),
     vscode.commands.registerCommand("remoteGitDiff.restoreHiddenTrackedChanges", restoreHiddenTrackedChanges),
     vscode.commands.registerCommand("remoteGitDiff.openDiff", openDiff),
