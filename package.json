@@ -1,7 +1,7 @@
 {
   "name": "remote-git-diff-tool",
   "displayName": "Remote Git Diff Tool",
-  "description": "通过 SSH 浏览远程 Linux 仓库的 Git 变更，并在 VS Code 中直接打开左右对比。",
+  "description": "閫氳繃 SSH 娴忚杩滅▼ Linux 浠撳簱鐨?Git 鍙樻洿锛屽苟鍦?VS Code 涓洿鎺ユ墦寮€宸﹀彸瀵规瘮銆?,
   "version": "0.0.1",
   "publisher": "local",
   "license": "MIT",
@@ -32,7 +32,7 @@
       "activitybar": [
         {
           "id": "remoteGitDiff",
-          "title": "Remote Git Diff",
+          "title": "杩滅▼宸紓",
           "icon": "$(diff)"
         }
       ]
@@ -41,98 +41,88 @@
       "remoteGitDiff": [
         {
           "id": "remoteGitDiff.changes",
-          "name": "Changes"
+          "name": "鍙樻洿"
         }
       ]
     },
     "commands": [
       {
         "command": "remoteGitDiff.refresh",
-        "title": "刷新远程 Git 变更",
+        "title": "鍒锋柊杩滅▼ Git 鍙樻洿",
         "icon": "$(refresh)"
       },
       {
         "command": "remoteGitDiff.configure",
-        "title": "打开远程 Git Diff 配置",
+        "title": "鎵撳紑杩滅▼ Git Diff 閰嶇疆",
         "icon": "$(gear)"
       },
       {
         "command": "remoteGitDiff.openDiff",
-        "title": "打开差异对比",
+        "title": "鎵撳紑宸紓瀵规瘮",
         "icon": "$(diff)"
       },
       {
         "command": "remoteGitDiff.reconnect",
-        "title": "重新连接远程 Git",
-        "icon": "$(debug-restart)"
+        "title": "閲嶆柊杩炴帴杩滅▼ Git",
+        "icon": "$(link)"
       },
       {
         "command": "remoteGitDiff.disconnect",
-        "title": "断开远程 Git 连接",
+        "title": "鏂紑杩滅▼ Git 杩炴帴",
         "icon": "$(debug-disconnect)"
       },
       {
         "command": "remoteGitDiff.openLogFile",
-        "title": "打开远程 Git Diff 日志",
-        "icon": "$(output)"
+        "title": "鎵撳紑杩滅▼ Git Diff 鏃ュ織",
+        "icon": "$(note)"
       },
       {
         "command": "remoteGitDiff.hideCurrentTrackedChanges",
-        "title": "隐藏当前变更",
+        "title": "闅愯棌褰撳墠鍙樻洿",
         "icon": "$(eye-closed)"
       },
       {
         "command": "remoteGitDiff.restoreHiddenTrackedChanges",
-        "title": "恢复隐藏变更",
-        "icon": "$(eye)"
+        "title": "鎭㈠闅愯棌鍙樻洿",
+        "icon": "$(list-selection)"
       },
       {
         "command": "remoteGitDiff.stageAllVisibleChanges",
-        "title": "一键添加所有变更",
+        "title": "涓€閿坊鍔犳墍鏈夊彉鏇?,
         "icon": "$(add)"
       }
     ],
     "menus": {
       "view/title": [
         {
+          "command": "remoteGitDiff.stageAllVisibleChanges",
+          "when": "view == remoteGitDiff.changes && remoteGitDiff.connectionState == connected && remoteGitDiff.hasChanges && remoteGitDiff.hasHiddenTrackedFiles",
+          "group": "navigation@1"
+        },
+        {
           "command": "remoteGitDiff.refresh",
-          "when": "view == remoteGitDiff.changes",
-          "group": "navigation"
-        },
-        {
-          "command": "remoteGitDiff.configure",
-          "when": "view == remoteGitDiff.changes",
-          "group": "navigation"
-        },
-        {
-          "command": "remoteGitDiff.reconnect",
-          "when": "view == remoteGitDiff.changes",
-          "group": "navigation"
-        },
-        {
-          "command": "remoteGitDiff.disconnect",
           "when": "view == remoteGitDiff.changes && remoteGitDiff.connectionState == connected",
-          "group": "navigation"
-        },
-        {
-          "command": "remoteGitDiff.openLogFile",
-          "when": "view == remoteGitDiff.changes",
-          "group": "navigation"
+          "group": "navigation@2"
         },
         {
           "command": "remoteGitDiff.hideCurrentTrackedChanges",
           "when": "view == remoteGitDiff.changes && remoteGitDiff.connectionState == connected && remoteGitDiff.hasChanges",
-          "group": "navigation"
+          "group": "navigation@3"
         },
         {
           "command": "remoteGitDiff.restoreHiddenTrackedChanges",
           "when": "view == remoteGitDiff.changes && remoteGitDiff.connectionState == connected && remoteGitDiff.hasHiddenTrackedFiles",
-          "group": "navigation"
+          "group": "navigation@4"
         },
         {
-          "command": "remoteGitDiff.stageAllVisibleChanges",
-          "when": "view == remoteGitDiff.changes && remoteGitDiff.connectionState == connected && remoteGitDiff.hasChanges && remoteGitDiff.hasHiddenTrackedFiles",
-          "group": "navigation"
+          "command": "remoteGitDiff.reconnect",
+          "when": "view == remoteGitDiff.changes && remoteGitDiff.connectionState != connected",
+          "group": "navigation@5"
+        },
+        {
+          "command": "remoteGitDiff.configure",
+          "when": "view == remoteGitDiff.changes",
+          "group": "navigation@99"
         }
       ],
       "view/item/context": [
@@ -149,42 +139,42 @@
         "remoteGitDiff.host": {
           "type": "string",
           "default": "",
-          "description": "远程 Linux 服务器的 SSH 主机名或 IP。"
+          "description": "杩滅▼ Linux 鏈嶅姟鍣ㄧ殑 SSH 涓绘満鍚嶆垨 IP銆?
         },
         "remoteGitDiff.port": {
           "type": "number",
           "default": 22,
-          "description": "远程 Linux 服务器的 SSH 端口。"
+          "description": "杩滅▼ Linux 鏈嶅姟鍣ㄧ殑 SSH 绔彛銆?
         },
         "remoteGitDiff.username": {
           "type": "string",
           "default": "",
-          "description": "连接远程 Linux 服务器所使用的 SSH 用户名。"
+          "description": "杩炴帴杩滅▼ Linux 鏈嶅姟鍣ㄦ墍浣跨敤鐨?SSH 鐢ㄦ埛鍚嶃€?
         },
         "remoteGitDiff.projectPath": {
           "type": "string",
           "default": "",
-          "description": "远程 Linux 服务器上的 Git 仓库绝对路径。只有当前 VS Code 工作区本身就是真实仓库路径时才可以留空。"
+          "description": "杩滅▼ Linux 鏈嶅姟鍣ㄤ笂鐨?Git 浠撳簱缁濆璺緞銆傚彧鏈夊綋鍓?VS Code 宸ヤ綔鍖烘湰韬氨鏄湡瀹炰粨搴撹矾寰勬椂鎵嶅彲浠ョ暀绌恒€?
         },
         "remoteGitDiff.privateKeyPath": {
           "type": "string",
           "default": "",
-          "description": "可选，本地私钥文件路径。配置页也可以直接保存。"
+          "description": "鍙€夛紝鏈湴绉侀挜鏂囦欢璺緞銆傞厤缃〉涔熷彲浠ョ洿鎺ヤ繚瀛樸€?
         },
         "remoteGitDiff.strictHostKeyChecking": {
           "type": "boolean",
           "default": true,
-          "description": "是否启用 SSH 严格主机校验。"
+          "description": "鏄惁鍚敤 SSH 涓ユ牸涓绘満鏍￠獙銆?
         },
         "remoteGitDiff.autoRefreshOnFocus": {
           "type": "boolean",
           "default": true,
-          "description": "当 VS Code 重新获得焦点，或远程 Git Diff 视图重新可见时，自动刷新变更。"
+          "description": "褰?VS Code 閲嶆柊鑾峰緱鐒︾偣锛屾垨杩滅▼ Git Diff 瑙嗗浘閲嶆柊鍙鏃讹紝鑷姩鍒锋柊鍙樻洿銆?
         },
         "remoteGitDiff.disableDiffTimeoutPrompt": {
           "type": "boolean",
           "default": true,
-          "description": "默认将当前工作区的 diffEditor.maxComputationTime 设为 0，避免 VS Code 显示 5 秒超时提示。"
+          "description": "榛樿灏嗗綋鍓嶅伐浣滃尯鐨?diffEditor.maxComputationTime 璁句负 0锛岄伩鍏?VS Code 鏄剧ず 5 绉掕秴鏃舵彁绀恒€?
         },
         "remoteGitDiff.diffViewMode": {
           "type": "string",
@@ -193,17 +183,17 @@
             "native",
             "auto"
           ],
-          "description": "差异展示模式。native 始终使用 VS Code 原生左右对比；auto 才允许超大变更切换到插件内置预览。"
+          "description": "宸紓灞曠ず妯″紡銆俷ative 濮嬬粓浣跨敤 VS Code 鍘熺敓宸﹀彸瀵规瘮锛沘uto 鎵嶅厑璁歌秴澶у彉鏇村垏鎹㈠埌鎻掍欢鍐呯疆棰勮銆?
         },
         "remoteGitDiff.largeDiffThresholdBytes": {
           "type": "number",
           "default": 250000,
-          "description": "文件内容超过该大小时，才会进一步评估是否切换到补丁差异视图。"
+          "description": "鏂囦欢鍐呭瓒呰繃璇ュぇ灏忔椂锛屾墠浼氳繘涓€姝ヨ瘎浼版槸鍚﹀垏鎹㈠埌琛ヤ竵宸紓瑙嗗浘銆?
         },
         "remoteGitDiff.largeChangeThresholdLines": {
           "type": "number",
           "default": 200,
-          "description": "当新增行数与删除行数总和超过该值，且文件内容也较大时，使用补丁差异视图。"
+          "description": "褰撴柊澧炶鏁颁笌鍒犻櫎琛屾暟鎬诲拰瓒呰繃璇ュ€硷紝涓旀枃浠跺唴瀹逛篃杈冨ぇ鏃讹紝浣跨敤琛ヤ竵宸紓瑙嗗浘銆?
         },
         "remoteGitDiff.statusArgs": {
           "type": "array",
@@ -213,7 +203,7 @@
           "default": [
             "--untracked-files=no"
           ],
-          "description": "附加到 git status 后面的额外参数。"
+          "description": "闄勫姞鍒?git status 鍚庨潰鐨勯澶栧弬鏁般€?
         }
       }
     }
