@@ -337,6 +337,18 @@ export class RemoteGitService {
     };
   }
 
+  public async stageTrackedChanges(paths: string[]): Promise<number> {
+    const normalizedPaths = [...new Set(paths.map((item) => item.trim()).filter(Boolean))];
+    if (normalizedPaths.length === 0) {
+      return 0;
+    }
+
+    const config = await this.getValidatedConfig();
+    await this.runner.runGit(config, ["add", "--update", "--", ...normalizedPaths]);
+    this.logger?.info("已暂存 tracked 变更", { count: normalizedPaths.length });
+    return normalizedPaths.length;
+  }
+
   private async getValidatedConfig(
     providedConfig?: RemoteGitConfig,
     allowCache = true

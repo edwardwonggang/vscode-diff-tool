@@ -85,6 +85,11 @@
         "command": "remoteGitDiff.restoreHiddenTrackedChanges",
         "title": "恢复隐藏变更",
         "icon": "$(eye)"
+      },
+      {
+        "command": "remoteGitDiff.stageAllVisibleChanges",
+        "title": "一键添加所有变更",
+        "icon": "$(add)"
       }
     ],
     "menus": {
@@ -122,6 +127,11 @@
         {
           "command": "remoteGitDiff.restoreHiddenTrackedChanges",
           "when": "view == remoteGitDiff.changes && remoteGitDiff.connectionState == connected && remoteGitDiff.hasHiddenTrackedFiles",
+          "group": "navigation"
+        },
+        {
+          "command": "remoteGitDiff.stageAllVisibleChanges",
+          "when": "view == remoteGitDiff.changes && remoteGitDiff.connectionState == connected && remoteGitDiff.hasChanges && remoteGitDiff.hasHiddenTrackedFiles",
           "group": "navigation"
         }
       ],
