@@ -1002,11 +1002,6 @@ export function activate(context: vscode.ExtensionContext): void {
       const openStartedAt = Date.now();
       const stageTimings: Record<string, number> = {};
       await ensureConnectedForOpenDiff();
-      updatePatchLoadingStage("正在读取变更信息");
-      loadingHintTimer = setTimeout(() => {
-        loadingHintVisible = true;
-        updatePatchLoadingStage("正在生成差异预览...");
-      }, 900);
       logger.info("开始打开对比", { requestId: token.requestId, path: change.path, originalPath: change.originalPath });
 
       const statsStartedAt = Date.now();
@@ -1017,6 +1012,12 @@ export function activate(context: vscode.ExtensionContext): void {
         void showAutoDismissNotification("此文件为非文本文件，暂不支持左右对比。", 3000);
         return;
       }
+
+      updatePatchLoadingStage("正在读取变更信息");
+      loadingHintTimer = setTimeout(() => {
+        loadingHintVisible = true;
+        updatePatchLoadingStage("正在生成差异预览...");
+      }, 900);
 
       const sizeStartedAt = Date.now();
       const [leftLength, rightLength] = await Promise.all([
