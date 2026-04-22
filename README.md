@@ -1,50 +1,94 @@
 # 远程 Git Diff
 
-这个 VS Code 插件通过 SSH 连接远程 Linux 服务器，读取远程仓库中的 tracked 文件变更，并在 VS Code 内直接打开左右对比。
+一个面向远程 Linux 开发场景的 VS Code 插件。插件通过 SSH 在远端仓库执行 Git 命令，只读取真正关心的 tracked 工作区变更，并在 VS Code 中快速打开差异对比。
 
-## 功能
+## 设计动机
 
-- 通过 `git status --porcelain=v1 -z` 读取远程仓库中的 tracked 文件变更
-- 以目录树形式展示修改、新增、删除、重命名、复制和冲突文件
-- 点击文件后，使用远程 `HEAD` 内容与远程工作区当前内容做左右对比
-- 所有 Git 判断都在 Linux 上执行，避免 Windows 换行符和文件属性误判
+日常开发中，代码实际修改发生在远程 Linux 服务器上，但很多 Windows 本地 Git 插件会出现两个问题：
 
-## 设置页面
+- 识别结果不准，经常把换行、文件属性、构建产物或本地映射目录中的噪音文件误判为手工修改。
+- 扫描速度慢，项目一大之后刷新和打开差异都会明显拖慢操作节奏。
+
+这个插件的出发点很简单：不要从 Windows 本地工作区猜测改动，而是直接在远端仓库执行 Git，拿到最接近真实开发现场的变更结果。
+
+## 功能演进
+
+插件的能力不是一次性设计出来的，而是沿着实际使用链路逐步补齐的：
+
+1. 先解决“准确识别远端真实改动”的问题。
+   通过 SSH 连接远程 Linux，在远端执行 `git status --porcelain=v1 -z`，避免 Windows 本地 Git 扫描带来的误判和性能问题。
+
+2. 再解决“编译产物混入变更列表”的问题。
+   实际项目里会有很多自动生成文件，它们并不是当前想审查或提交的内容，所以补充了一键隐藏当前变更、隐藏单文件、恢复隐藏文件等能力。
+
+3. 再解决“大差异渲染卡顿”的问题。
+   当文件差异较大时，VS Code 原生 Diff 可能需要较长时间计算和渲染，因此插件提供两套展示路径：
+   - 小中型差异优先使用 VS Code 原生左右对比
+   - 大差异或超大文件场景切换到插件内置补丁预览，兼顾速度和可读性
+
+4. 最后补上“选择性暂存”的操作能力。
+   日常开发并不是每次都一次性提交全部文件，所以增加了单文件 `add` 和一键批量 `add`，让查看改动和执行基础 Git 操作可以在同一条流程里完成。
+
+## 当前能力
+
+- 通过 SSH 连接远程 Linux 仓库读取 tracked 工作区变更
+- 使用目录树展示修改、新增、删除、重命名、复制和冲突文件
+- 支持单文件打开差异对比
+- 支持大差异自动切换到补丁预览
+- 支持隐藏当前所有 tracked 变更
+- 支持隐藏单个 tracked 文件
+- 支持恢复已隐藏文件
+- 支持单文件暂存
+- 支持一键暂存当前可见变更
+- 支持自动刷新、重连和日志查看
+
+## 为什么不是直接用本地 Git 插件
+
+这个插件主要解决的是“远端仓库真实状态”和“Windows 本地工作区感知结果”不一致的问题。
+
+适合以下场景：
+
+- 代码实际保存在远程 Linux 服务器
+- 日常通过 SSH 或远程挂载目录进行开发
+- 本地 Git 插件会扫出大量并非真正手改的文件
+- 大仓库或构建型项目下，本地扫描和原生 Diff 性能不稳定
+
+如果你的仓库完全在本地，而且 Git 插件扫描准确、Diff 也足够快，那未必需要这个插件。
+
+## 设置说明
 
 可通过命令面板执行“打开远程 Git Diff 设置”，也可以在首次刷新时自动弹出设置页。
 
-设置页支持：
+支持配置：
 
-- 保存 `host`、`port`、`username`、Linux 仓库路径、密码和私钥路径
-- 持久化保存到 VS Code，只需填写一次
-- 保存前先测试 SSH 连接
-- 一步完成“保存并连接”
-- 根据当前 Windows 挂载工作区自动推断 Linux 仓库路径
+- `host`
+- `port`
+- `username`
+- `projectPath`
+- `privateKeyPath`
+- `password`
+- `strictHostKeyChecking`
+
+插件会把配置保存到 VS Code，并在后续刷新时复用。
 
 ## 路径规则
 
-- 如果项目本身就是通过 VS Code `Remote - SSH` 打开的，请将 `remoteGitDiff.host` 留空，插件会直接使用当前 Linux 工作区路径。
-- 如果设置了 `remoteGitDiff.host`，那么 `remoteGitDiff.projectPath` 必须填写该服务器上的 Linux 路径，例如 `/home/wanggang/src/dmu/hvli/trunk`。
-- 不要把 `X:\src\dmu\hvli\trunk` 这种 Windows 路径直接当作远程仓库路径。
-- 如果当前 Windows 工作区类似 `X:\src\dmu\hvli\trunk`，设置页会默认建议 `/home/<username>/src/dmu/hvli/trunk`。
+- 如果当前项目本身就是通过 VS Code `Remote - SSH` 打开的，可以将 `remoteGitDiff.host` 留空，插件会直接使用当前 Linux 工作区路径。
+- 如果配置了 `remoteGitDiff.host`，则 `remoteGitDiff.projectPath` 需要填写远程服务器上的真实 Linux 仓库路径，例如 `/home/user/project`.
+- 不要把 `X:\repo\project` 这类 Windows 路径直接当作远程仓库路径。
 
-## 变更视图
+## 差异展示策略
 
-变更文件以目录树形式展示，而不是平铺列表。点击文件后，会打开远程 `HEAD` 与远程工作区当前文件内容的左右对比。
+- 默认优先使用 VS Code 原生左右对比
+- 当文件过大或差异过大时，可切换到插件内置补丁预览
+- 插件会尽量避免在超大差异场景下直接把 VS Code Diff 拖慢
 
-## 刷新行为
-
-- 插件会长期保存连接配置，并在需要时自动重连。
-- 当 VS Code 重新获得焦点，或 `远程 Git Diff` 视图重新显示时，可自动刷新。
-- 默认始终优先打开左右对比。
-- 如果你希望超大文件改为打开 patch 文本，可启用 `remoteGitDiff.openPatchOnLargeDiff`。
-- 默认会将当前工作区的 `diffEditor.maxComputationTime` 设为 `0`，避免出现“差异算法已提前停止(在 5000 ms 之后)”提示。
-
-## 构建
+## 构建与打包
 
 ```bash
 npm install
 npm run build
+npm run package
 ```
 
-在 VS Code 中按 `F5` 即可启动扩展调试宿主。
+打包后会在项目根目录生成 `.vsix` 文件，可直接在 VS Code 中安装测试。
