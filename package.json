@@ -62,6 +62,16 @@
         "icon": "$(diff)"
       },
       {
+        "command": "remoteGitDiff.stageSingleChange",
+        "title": "添加当前变更",
+        "icon": "$(add)"
+      },
+      {
+        "command": "remoteGitDiff.hideSingleTrackedChange",
+        "title": "隐藏当前变更",
+        "icon": "$(eye-closed)"
+      },
+      {
         "command": "remoteGitDiff.reconnect",
         "title": "重新连接远程 Git",
         "icon": "$(link)"
@@ -127,9 +137,14 @@
       ],
       "view/item/context": [
         {
-          "command": "remoteGitDiff.openDiff",
-          "when": "view == remoteGitDiff.changes && viewItem == remoteGitDiff.change",
-          "group": "inline"
+          "command": "remoteGitDiff.stageSingleChange",
+          "when": "view == remoteGitDiff.changes && viewItem == remoteGitDiff.change && remoteGitDiff.connectionState == connected",
+          "group": "inline@1"
+        },
+        {
+          "command": "remoteGitDiff.hideSingleTrackedChange",
+          "when": "view == remoteGitDiff.changes && viewItem == remoteGitDiff.change && remoteGitDiff.connectionState == connected",
+          "group": "inline@2"
         }
       ]
     },
