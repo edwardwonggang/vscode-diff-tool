@@ -482,6 +482,12 @@ PY`
       const entry = entries[index];
       const status = entry.slice(0, 2);
       const path = entry.slice(3);
+      if (!this.shouldIncludeTrackedChange(status)) {
+        if (status.startsWith("R") || status.startsWith("C")) {
+          index += 1;
+        }
+        continue;
+      }
       const code = this.mapStatus(status);
 
       if (status.startsWith("R") || status.startsWith("C")) {
@@ -508,6 +514,22 @@ PY`
     }
 
     return changes;
+  }
+
+  private shouldIncludeTrackedChange(status: string): boolean {
+    const indexStatus = status[0] ?? " ";
+    const worktreeStatus = status[1] ?? " ";
+    const normalized = `${indexStatus}${worktreeStatus}`;
+
+    if (normalized.includes("?")) {
+      return false;
+    }
+
+    if (normalized.includes("U")) {
+      return true;
+    }
+
+    return worktreeStatus !== " ";
   }
 
   private mapStatus(status: string): RemoteGitChange["code"] {

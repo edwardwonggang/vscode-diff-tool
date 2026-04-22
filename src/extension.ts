@@ -23,11 +23,33 @@ function isConnectedState(state: ConnectionState): boolean {
   return state === "connected";
 }
 
+function getChangeDisplayPath(change: RemoteGitChange): string {
+  return change.originalPath ? `${change.originalPath} -> ${change.path}` : change.path;
+}
+
+function getChangeDisplayName(change: RemoteGitChange): string {
+  const currentName = getFileName(change.path);
+  const originalName = change.originalPath ? getFileName(change.originalPath) : undefined;
+  return originalName && originalName !== currentName ? `${originalName} -> ${currentName}` : currentName;
+}
+
+function buildDisplayPath(side: "left" | "right", change: RemoteGitChange): string {
+  return side === "left" ? change.originalPath ?? change.path : change.path;
+}
+
 function buildContentUri(side: "left" | "right", change: RemoteGitChange): vscode.Uri {
-  const suffix = side === "left" ? "HEAD" : "WORKTREE";
-  return vscode.Uri.parse(
-    `${REMOTE_GIT_SCHEME}:/${suffix}/${encodeURIComponent(change.path)}?side=${side}&path=${encodeURIComponent(change.path)}`
-  );
+  const suffix = side === "left" ? "head" : "worktree";
+  const displayPath = buildDisplayPath(side, change).replace(/^\/+/, "");
+  return vscode.Uri.from({
+    scheme: REMOTE_GIT_SCHEME,
+    authority: suffix,
+    path: `/${displayPath}`,
+    query: new URLSearchParams({
+      side,
+      path: change.path,
+      displayPath
+    }).toString()
+  });
 }
 
 function isRemoteGitChange(value: unknown): value is RemoteGitChange {
@@ -36,6 +58,17 @@ function isRemoteGitChange(value: unknown): value is RemoteGitChange {
   }
   const candidate = value as Partial<RemoteGitChange>;
   return typeof candidate.path === "string" && candidate.path.length > 0;
+}
+
+function extractRemoteGitChange(value: unknown): RemoteGitChange | undefined {
+  if (isRemoteGitChange(value)) {
+    return value;
+  }
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const candidate = value as { change?: unknown };
+  return isRemoteGitChange(candidate.change) ? candidate.change : undefined;
 }
 
 function escapeHtml(value: string): string {
@@ -424,7 +457,7 @@ function getPatchLoadingHtml(
   stageText: string,
   details?: { slowHint?: string }
 ): string {
-  const title = change.originalPath ? `${change.originalPath} -> ${change.path}` : change.path;
+  const title = getChangeDisplayPath(change);
   const styles = getPatchViewStyles();
   const slowHintBlock = details?.slowHint
     ? `<div class="loading-hint">${escapeHtml(details.slowHint)}</div>`
@@ -799,7 +832,7 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   const openPatchDiffPanel = (change: RemoteGitChange, rows: PatchRow[], stats: RemoteGitDiffStats): void => {
-    const title = change.originalPath ? `${change.originalPath} -> ${change.path}` : change.path;
+    const title = getChangeDisplayName(change);
     const panel = ensurePatchDiffPanel(title);
     panel.webview.html = getPatchDiffHtml(panel.webview, context.extensionUri, change, rows, stats);
   };
@@ -809,7 +842,7 @@ export function activate(context: vscode.ExtensionContext): void {
     stageText: string,
     details?: { slowHint?: string }
   ): void => {
-    const title = change.originalPath ? `${change.originalPath} -> ${change.path}` : change.path;
+    const title = getChangeDisplayName(change);
     const panel = ensurePatchDiffPanel(title);
     panel.webview.html = getPatchLoadingHtml(change, stageText, details);
   };
@@ -819,7 +852,7 @@ export function activate(context: vscode.ExtensionContext): void {
     stats: RemoteGitDiffStats,
     details: { leftLength: number; rightLength: number; reason: string; patchLength?: number }
   ): void => {
-    const title = change.originalPath ? `${change.originalPath} -> ${change.path}` : change.path;
+    const title = getChangeDisplayName(change);
     const panel = ensurePatchDiffPanel(title);
     panel.webview.html = getLargeDiffSummaryHtml(change, stats, details);
   };
@@ -979,6 +1012,40 @@ export function activate(context: vscode.ExtensionContext): void {
     });
     void vscode.window.showInformationMessage(`已添加 ${stagedCount} 个可见变更。`);
     await refresh("stage-visible-tracked");
+  };
+
+  const stageSingleChange = async (item?: unknown): Promise<void> => {
+    const change = extractRemoteGitChange(item);
+    if (!change) {
+      logger.warn("忽略非文件节点的单文件添加请求", item);
+      return;
+    }
+
+    await ensureConnectedForOpenDiff();
+    const stagedCount = await service.stageTrackedChanges([change.path]);
+    logger.info("已添加单个 tracked 变更", {
+      path: change.path,
+      stagedCount
+    });
+    await refresh("stage-single-tracked");
+  };
+
+  const hideSingleTrackedChange = async (item?: unknown): Promise<void> => {
+    const change = extractRemoteGitChange(item);
+    if (!change) {
+      logger.warn("忽略非文件节点的单文件隐藏请求", item);
+      return;
+    }
+
+    await ensureConnectedForOpenDiff();
+    const result = await service.addHiddenTrackedFiles([change.path]);
+    hiddenTrackedFilePaths = result.paths;
+    logger.info("已隐藏单个 tracked 变更", {
+      path: change.path,
+      totalHiddenCount: result.paths.length,
+      filePath: result.filePath
+    });
+    await refresh("hide-single-tracked");
   };
 
   const openDiff = async (item?: unknown): Promise<void> => {
@@ -1169,20 +1236,19 @@ export function activate(context: vscode.ExtensionContext): void {
       contentProvider.setContent(leftUri, leftContent);
       contentProvider.setContent(rightUri, rightContent);
 
-      const title = change.originalPath
-        ? `${change.originalPath} -> ${change.path}`
-        : change.path;
+      const title = getChangeDisplayName(change);
 
       logger.info("触发 VS Code 原生左右对比", {
         requestId: token.requestId,
         path: change.path,
         title,
+        description: getChangeDisplayPath(change),
         preview: true,
         stageTimings
       });
 
       const nativeDiffStartedAt = Date.now();
-      await vscode.commands.executeCommand("vscode.diff", leftUri, rightUri, title, { preview: true });
+      await vscode.commands.executeCommand("vscode.diff", leftUri, rightUri, undefined, { preview: true });
       stageTimings.nativeDiffMs = Date.now() - nativeDiffStartedAt;
       await rememberNativeDiffOutcome(change, {
         lastDurationMs: stageTimings.nativeDiffMs,
@@ -1406,6 +1472,8 @@ export function activate(context: vscode.ExtensionContext): void {
       await vscode.window.showTextDocument(vscode.Uri.file(filePath), { preview: false });
     }),
     vscode.commands.registerCommand("remoteGitDiff.stageAllVisibleChanges", stageAllVisibleChanges),
+    vscode.commands.registerCommand("remoteGitDiff.stageSingleChange", stageSingleChange),
+    vscode.commands.registerCommand("remoteGitDiff.hideSingleTrackedChange", hideSingleTrackedChange),
     vscode.commands.registerCommand("remoteGitDiff.hideCurrentTrackedChanges", hideCurrentTrackedChanges),
     vscode.commands.registerCommand("remoteGitDiff.restoreHiddenTrackedChanges", restoreHiddenTrackedChanges),
     vscode.commands.registerCommand("remoteGitDiff.openDiff", openDiff),
